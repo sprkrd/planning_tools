@@ -2,6 +2,10 @@
 ## BASIC TYPES ##
 #################
 
+from copy import copy
+from random import random
+
+
 class Object:
 
     def __init__(self, name, type_=None):
@@ -40,7 +44,7 @@ class Object:
         return self._name
 
 
-class Predicate:
+class AtomicFunctional:
 
     def __init__(self, name, *args):
         self._name = name
@@ -59,16 +63,16 @@ class Predicate:
         return all(arg.is_ground() for arg in self._args)
 
     def strip_types(self):
-        return Predicate(self._name, *(arg.strip_type() for arg in self._args))
+        return AtomicFunctional(self._name, *(arg.strip_type() for arg in self._args))
 
     def bind(self, sigma):
-        return Predicate(self._name, *(arg.bind(sigma) for arg in self._args))
+        return AtomicFunctional(self._name, *(arg.bind(sigma) for arg in self._args))
 
     def signature(self):
         return "{}/{}".format(self._name, self.arity())
 
     def __eq__(self, other):
-        if isinstance(other, Predicate):
+        if isinstance(other, AtomicFunctional):
             return other._name == self._name and other._args == self._args
         return False
 
@@ -82,166 +86,196 @@ class Predicate:
         return "(" + self._name + ")"
 
 
-class Function(Predicate):
+class Predicate(AtomicFunctional):
     pass
 
 
-class ExpressionBase:
+class Function(AtomicFunctional):
+    pass
 
-    def __init__(self, root, *children):
-        self._root = root
-        self._children = children
-        
-    def root(self):
-        return self._root
 
+class Expression:
+    
     def is_atomic(self):
         raise NotImplementedError()
 
-    def __len__(self):
-        return len(self._children)
+    def bind(self, sigma):
+        raise NotImplementedError()
 
-    def __iter__(self):
-        return self._children.__iter__()
 
-    def __getitem__(self, idx):
-        return self._children[idx]
+class AtomicExpression(Expression):
+
+    def __init__(self, atom):
+        self._atom = atom
+
+    def atom(self):
+        return self._atom
+
+    def is_atomic(self):
+        return True
+
+    def is_symbolic(self):
+        return isinstance(self._atom, AtomicFunctional)
+
+    def bind(self, sigma):
+        cpy = copy(self)
+        if isinstance(self._atom, AtomicFunctional):
+            cpy._atom = cpy._atom.bind(sigma)
+        return cpy
 
     def __str__(self):
-        if self.is_atomic():
-            return str(self._root)
-        if self._children:
-            return "({} {})".format(self._root, " ".join(
-                str(child) for child in self._children))
-        return "({})".format(self._root)
+        return str(self._atom)
+
+
+class ListExpression(Expression):
+
+    def __init__(self, head, *tail):
+        self._head = head
+        self._tail = tail
+
+    def head(self):
+        return self._head
+
+    def tail(self):
+        return self._tail
+
+    def is_atomic(self):
+        return False
+
+    def bind(self, sigma):
+        cpy = copy(self)
+        cpy._tail = tuple(e.bind(sigma) for e in cpy._tail)
+        return cpy
+
+    def __str__(self):
+        if self._tail:
+            return "({} {})".format(self._head,
+                    " ".join(str(e) for e in self._tail))
+
+
+class QuantifiedExpression(Expression):
+
+    def __init__(self, quantifier, parameters, expression):
+        if not all(isinstance(o, Object) and not o.is_ground() for o in parameters):
+            raise Exception("parameters should be a list of not-ground objects")
+        self._quantifier = quantifier
+        self._parameters = parameters
+        self._expression = expression
+
+    def quantifier(self):
+        return self._quantifier
+
+    def parameters(self):
+        return self._parameters
+
+    def expression(self):
+        return self._expression
+
+    def is_atomic(self):
+        return False
+
+    def bind(self, sigma):
+        cpy = copy(self)
+        cpy._expression = cpy._expression.bind(sigma)
+        return cpy
+
+    def __str__(self):
+        return "({} ({}) {})".format(self._quantifier,
+                " ".join(str(p) for p in self._parameters), self._expression)
 
 
 #############
 ## QUERIES ##
 #############
 
-class Query(ExpressionBase):
+class Query:
 
     def eval(self, state):
         raise NotImplementedError()
 
 
-class Number(Query):
+class PredicateQuery(Query, AtomicExpression):
 
-    def __init__(self, number):
-        super().__init__(number)
-        assert isinstance(number, (float, int))
+    def eval(self, state):
+        raise NotImplementedError()
+
+
+class FunctionQuery(Query, AtomicExpression):
+
+    def eval(self, state):
+        raise NotImplementedError()
+
+
+class ConstantQuery(Query, AtomicExpression):
 
     def eval(self, state):
         # ignore state
-        return self.root()
-
-    def is_atomic(self):
-        return True
+        return self.atom()
 
 
-class AtomicQuery(Query):
-
-    def __init__(self, predicate):
-        super().__init__(predicate)
-        assert isinstance(predicate, Predicate)
-
-    def eval(self, state):
-        raise NotImplementedError()
-
-    def is_atomic(self):
-        return True
-
-
-class FunctionQuery(Query):
-
-    def __init__(self, function):
-        super().__init__(function)
-        assert isinstance(function, Function)
-
-    def eval(self, state):
-        raise NotImplementedError()
-
-    def is_atomic(self):
-        return True
-
-
-class ArithmeticQuery(Query):
+class ArithmeticQuery(Query, ListExpression):
 
     def __init__(self, op, lhs, rhs):
+        if op not in ("+", "-", "*", "/"):
+            raise Exception("op must be one of the four available symbols (+,-,/,*)")
         super().__init__(op, lhs, rhs)
-        assert op in ("+", "-", "*", "/")
 
     def eval(self, state):
-        lhs = self[0].eval(state)
-        rhs = self[1].eval(state)
-        op = self.root()
+        lhs = self.tail()[0].eval(state)
+        rhs = self.tail()[1].eval(state)
+        op = self.head()
         if op == "+": return lhs + rhs
         if op == "-": return lhs - rhs
         if op == "*": return lhs*rhs
         return lhs/rhs
 
-    def is_atomic(self):
-        return False
 
+class ComparisonQuery(Query, ListExpression):
 
-class ComparisonQuery(Query):
-
-    def __init__(self, comparison, lhs, rhs):
-        super().__init__(comparison, lhs, rhs)
-        assert comparison in ("<", ">", "<=", "=", ">=")
+    def __init__(self, comp, lhs, rhs):
+        if comp not in ("<", ">", "<=", "=", ">="):
+            raise Exception("cmp must be one of (<,>,<=,=,>=)")
+        super().__init__(comp, lhs, rhs)
         
     def eval(self, state):
-        lhs = self[0].eval(state)
-        rhs = self[1].eval(state)
-        comp = self.root()
+        lhs = self.tail()[0].eval(state)
+        rhs = self.tail()[1].eval(state)
+        comp = self.head()
         if comp == "<": return lhs < rhs
         if comp == ">": return lhs > rhs
         if comp == "<=": return lhs <= rhs
         if comp == "=": return lhs == rhs
         return lhs >= rhs
 
-    def is_atomic(self):
-        return False
 
+class AndQuery(Query, ListExpression):
 
-class AndQuery(Query):
-
-    def __init__(self, *children):
-        super().__init__("and", *children)
+    def __init__(self, *tail):
+        super().__init__("and", *tail)
 
     def eval(self, state):
-        return all(child.eval(state) for child in self)
-
-    def is_atomic(self):
-        return False
+        return all(e.eval(state) for e in self.tail())
 
 
-class OrQuery(Query):
+class OrQuery(ListExpression, Query):
 
-    def __init__(self, *children):
-        super().__init__("or", *children)
+    def __init__(self, *tail):
+        super().__init__("or", *tail)
 
     def eval(self, state):
-        return any(child.eval(state) for child in self)
-
-    def is_atomic(self):
-        return False
+        return any(e.eval(state) for e in self.tail())
 
 
-class NotQuery(Query):
+class NotQuery(ListExpression, Query):
 
     def __init__(self, negated):
         super().__init__("not", negated)
 
     def eval(self, state):
-        return not self[0].eval(state)
-
-    def is_atomic(self):
-        return False
+        return not self.tail()[0].eval(state)
 
 
-class ImplyQuery(Query):
+class ImplyQuery(ListExpression, Query):
 
     def __init__(self, lhs, rhs):
         super().__init__("imply", lhs, rhs)
@@ -249,148 +283,136 @@ class ImplyQuery(Query):
     def eval(self, state):
         return not self[0].eval(state) or self[1].eval(state)
 
-    def is_atomic(self):
-        return False
 
+class TotalQuery(QuantifiedExpression, Query):
 
-class TotalQuery(Query):
-
-    def __init__(self, variables, exp):
-        super().__init__("forall", exp)
-        assert all(isinstance(obj, Object) and not obj.is_ground()
-                   for obj in variables)
-        self._variables = variables
+    def __init__(self, parameters, exp):
+        super().__init__("forall", parameters, exp)
 
     def eval(self, state):
         raise NotImplementedError()
 
-    def is_atomic(self):
-        return False
 
-    def __str__(self):
-        return "(forall ({}) {})".format(
-                " ".join(str(obj) for obj in self._variables), self[0])
+class ExistentialQuery(QuantifiedExpression, Query):
 
-
-class ExistentialQuery(Query):
-
-    def __init__(self, variables, exp):
-        super().__init__("exists", exp)
-        assert all(not obj.is_ground() for obj in variables)
-        self._variables = variables
+    def __init__(self, parameters, exp):
+        super().__init__("exists", parameters, exp)
 
     def eval(self, state):
         raise NotImplementedError()
-
-    def is_atomic(self):
-        return False
-
-    def __str__(self):
-        return "(exists ({}) {})".format(
-                " ".join(str(obj) for obj in self._variables), self[0])
 
 
 #############
 ## EFFECTS ##
 #############
 
-class Effect(ExpressionBase):
+class Effect:
 
-    def apply(self, state):
-        raise NotImplementedError()
+    def apply(self, state, out=None):
+        if out is None: out = copy(state)
+        return out
 
 
-class AtomicEffect(Effect):
+class AddEffect(AtomicExpression, Effect):
 
     def __init__(self, predicate):
         super().__init__(predicate)
-        assert isinstance(predicate, Predicate)
 
-    def apply(self, state):
+    def apply(self, state, out=None):
         raise NotImplementedError()
 
-    def is_atomic(self):
-        return True
 
-
-class DeleteEffect(Effect):
+class DeleteEffect(ListExpression, Effect):
 
     def __init__(self, predicate):
         super().__init__("not", predicate)
-        assert isinstance(predicate, Predicate)
 
-    def apply(self, state):
-        raise NotImplementedError()
-
-    def is_atomic(self):
-        return False
+    def apply(self, state, out=None):
+        return super().apply(state, out)
 
 
-class AndEffect(Effect):
+class AndEffect(ListExpression, Effect):
 
-    def __init__(self, *children):
-        super().__init__("and", *children)
-        assert all(isinstance(child, Effect) for child in children)
+    def __init__(self, *tail):
+        super().__init__("and", *tail)
 
-    def apply(self, state):
-        raise NotImplementedError()
-
-    def is_atomic(self):
-        return False
-
-
-class TotalEffect(Effect):
-
-    def __init__(self, variables, effect):
-        super().__init__("forall", effect)
-        assert all(isinstance(obj, Object) and not obj.is_ground()
-                   for obj in variables)
-        self._variables = variables
-
-    def apply(self, state):
-        raise NotImplementedError()
-
-    def is_atomic(self):
-        return False
-
-    def __str__(self):
-        return "(forall ({}) {})".format(
-                " ".join(str(obj) for obj in self._variables), self[0])
+    def apply(self, state, out=None):
+        out = super().apply(state, out)
+        for effect in self.tail():
+            out = effect.apply(state, out)
+        return out
 
 
-class ConditionalEffect(Effect):
+class TotalEffect(QuantifiedExpression, Effect):
+
+    def __init__(self, parameters, effect):
+        super().__init__("forall", parameters, effect)
+
+    def apply(self, state, out=None):
+        return super().apply(state, out)
+
+
+class ConditionalEffect(ListExpression, Effect):
 
     def __init__(self, lhs, rhs):
         super().__init__("when", lhs, rhs)
-        assert isinstance(lhs, Query)
-        assert isinstance(rhs, Effect)
 
-    def apply(self, state):
-        raise NotImplementedError()
+    def apply(self, state, out=None):
+        out = super().apply(state, out)
+        lhs = self.tail()[0].eval(state)
+        if lhs:
+            out = rhs.apply(state, out)
+        return out
 
-    def is_atomic(self):
-        return False
 
-
-class AssignmentEffect(Effect):
+class AssignmentEffect(Effect, ListExpression):
 
     def __init__(self, assign, lhs, rhs):
+        if assign not in ("assign", "increase", "decrease", "scale-up",
+                          "scale-down"):
+            raise Exception("assign operator must be one of (assign, "
+                            "increase, decrease, scale-up, scale-down)")
         super().__init__(assign, lhs, rhs)
-        assert isinstance(lhs, Function)
-        assert isinstance(rhs, (ArithmeticQuery, FunctionQuery, Number))
+
+    def apply(self, state, out=None):
+        return super().apply(state, out)
 
 
-    def apply(self, state):
-        raise NotImplementedError()
+class ProbabilisticEffect(Effect, ListExpression):
 
-    def is_atomic(self):
-        return False
+    def __init__(self, *tail):
+        total_prob = 0
+        for e in tail[::2]:
+            total_prob += e
+        if total_prob > 1+1e-6:
+            raise Exception("Probability greater than 1")
+        super().__init__("probabilistic", *tail)
+
+    def __len__(self):
+        return len(self.tail()) // 2
+
+    def __getitem__(self, idx):
+        return self.tail()[idx*2:(idx+1)*2]
+
+    def __iter__(self):
+        for idx in range(len(self)):
+            yield self[idx]
+
+    def apply(self, state, out=None):
+        out = super().apply(state, out)
+        r = random()
+        acc = 0
+        for p, effect in self:
+            acc += p
+            if r < p:
+                out = effect.apply(state, out)
+                break
+        return out
 
 
 ####################
 ## DOMAIN OBJECTS ##
 ####################
-
 
 class Action:
 

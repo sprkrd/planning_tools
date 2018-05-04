@@ -3,22 +3,29 @@ from ..pddl import *
 
 
 def main():
-    e = ArithmeticQuery("+", Number(5),
-            ArithmeticQuery("*", Number(7), Number(3)))
-    comp = ComparisonQuery(">", e, Number(25))
+    e = ArithmeticQuery("+", ConstantQuery(5),
+            ArithmeticQuery("*", ConstantQuery(7), ConstantQuery(3)))
     print(e)
     print(e.eval(None))
+    comp = ComparisonQuery(">", e, ConstantQuery(25))
     print(comp)
     print(comp.eval(None))
-    and_ = AndQuery(comp, NotQuery(ComparisonQuery("=", Number(1),
-        Number(1))))
+    and_ = AndQuery(comp, NotQuery(ComparisonQuery("=", ConstantQuery(1),
+        ConstantQuery(2))))
     print(and_)
     print(and_.eval(None))
-    print(NotQuery(AtomicQuery(Predicate("empty"))))
-    print(DeleteEffect(Predicate("empty")))
+    print(NotQuery(PredicateQuery(AtomicFunctional("empty"))))
+    print(DeleteEffect(AtomicFunctional("empty")))
 
-    print(TotalQuery([Object("?x", "block")], AtomicQuery(Predicate("clear", "x"))))
-    print(TotalEffect([Object("?x", "block")], DeleteEffect(Predicate("clear", "x"))))
+    print(ExistentialQuery([Object("?x", "block")], PredicateQuery(AtomicFunctional("clear", "x"))))
+    print(TotalEffect([Object("?x", "block")], DeleteEffect(AtomicFunctional("clear", "x"))))
+
+    peff = ProbabilisticEffect(0.5, AddEffect(AtomicFunctional("empty")), 0.3,
+        DeleteEffect(AtomicFunctional("clear", "?x")))
+
+    for p, eff in peff:
+        print(str(p) + " " + str(eff))
+
     # o = Object("?b0", "block")
     # p = Predicate("p")
     # print(p)
