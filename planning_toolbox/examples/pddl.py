@@ -17,14 +17,20 @@ def main():
     print(NotQuery(PredicateQuery(AtomicFunctional("empty"))))
     print(DeleteEffect(AtomicFunctional("empty")))
 
-    print(ExistentialQuery([Object("?x", "block")], PredicateQuery(AtomicFunctional("clear", "x"))))
-    print(TotalEffect([Object("?x", "block")], DeleteEffect(AtomicFunctional("clear", "x"))))
+    print(ExistentialQuery([Object("?x", "block")], PredicateQuery(Predicate("clear", "x"))))
+    print(TotalEffect([Object("?x", "block")], DeleteEffect(Predicate("clear", "x"))))
 
     peff = ProbabilisticEffect(0.5, AddEffect(AtomicFunctional("empty")), 0.3,
         DeleteEffect(AtomicFunctional("clear", "?x")))
 
     for p, eff in peff:
         print(str(p) + " " + str(eff))
+
+    act = Action("pick", [Object("?b", "block")], AndQuery(
+        Predicate("on-table", "?b"), Predicate("clear", "?b"),
+        Predicate("empty-hand")), AndEffect(DeleteEffect(Predicate("empty-hand")),
+            AddEffect(Predicate("holding", "?b")), DeleteEffect(Predicate("clear", "?b"))))
+    print(act)
 
     # o = Object("?b0", "block")
     # p = Predicate("p")

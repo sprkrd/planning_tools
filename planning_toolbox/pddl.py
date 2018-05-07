@@ -191,29 +191,32 @@ class QuantifiedExpression(Expression):
 class Query:
 
     def eval(self, state):
-        raise NotImplementedError()
+        return True
+
+    def __str__(self):
+        return "()"
 
 
-class PredicateQuery(Query, AtomicExpression):
-
-    def eval(self, state):
-        raise NotImplementedError()
-
-
-class FunctionQuery(Query, AtomicExpression):
+class PredicateQuery(AtomicExpression, Query):
 
     def eval(self, state):
         raise NotImplementedError()
 
 
-class ConstantQuery(Query, AtomicExpression):
+class FunctionQuery(AtomicExpression, Query):
+
+    def eval(self, state):
+        raise NotImplementedError()
+
+
+class ConstantQuery(AtomicExpression, Query):
 
     def eval(self, state):
         # ignore state
         return self.atom()
 
 
-class ArithmeticQuery(Query, ListExpression):
+class ArithmeticQuery(ListExpression, Query):
 
     def __init__(self, op, lhs, rhs):
         if op not in ("+", "-", "*", "/"):
@@ -230,7 +233,7 @@ class ArithmeticQuery(Query, ListExpression):
         return lhs/rhs
 
 
-class ComparisonQuery(Query, ListExpression):
+class ComparisonQuery(ListExpression, Query):
 
     def __init__(self, comp, lhs, rhs):
         if comp not in ("<", ">", "<=", "=", ">="):
@@ -248,7 +251,7 @@ class ComparisonQuery(Query, ListExpression):
         return lhs >= rhs
 
 
-class AndQuery(Query, ListExpression):
+class AndQuery(ListExpression, Query):
 
     def __init__(self, *tail):
         super().__init__("and", *tail)
@@ -312,6 +315,9 @@ class Effect:
         if out is None: out = copy(state)
         return out
 
+    def __str__(self):
+        return "()"
+
 
 class AddEffect(AtomicExpression, Effect):
 
@@ -319,7 +325,7 @@ class AddEffect(AtomicExpression, Effect):
         super().__init__(predicate)
 
     def apply(self, state, out=None):
-        raise NotImplementedError()
+        return super().apply(state, out)
 
 
 class DeleteEffect(ListExpression, Effect):
@@ -365,7 +371,7 @@ class ConditionalEffect(ListExpression, Effect):
         return out
 
 
-class AssignmentEffect(Effect, ListExpression):
+class AssignmentEffect(ListExpression, Effect):
 
     def __init__(self, assign, lhs, rhs):
         if assign not in ("assign", "increase", "decrease", "scale-up",
@@ -378,7 +384,7 @@ class AssignmentEffect(Effect, ListExpression):
         return super().apply(state, out)
 
 
-class ProbabilisticEffect(Effect, ListExpression):
+class ProbabilisticEffect(ListExpression, Effect):
 
     def __init__(self, *tail):
         total_prob = 0
@@ -416,12 +422,23 @@ class ProbabilisticEffect(Effect, ListExpression):
 
 class Action:
 
-    def __init__(self, parameters):
-        assert all(isinstance(param, Object) for param in parameters)
+    def __init__(self, name, parameters, precondition, effect):
+        self._name = name
         self._parameters = parameters
+        self._precondition = precondition
+        self._effect = effect
+
+    def name(self):
+        return self._name
 
     def parameters(self):
         return self._parameters
+
+    def precondition(self):
+        return self._precondition
+
+    def effect(self):
+        return self._effect
 
     def is_applicable(self, state):
         raise NotImplementedError()
@@ -429,15 +446,10 @@ class Action:
     def apply(self, state):
         raise NotImplementedError()
 
-
-class RichAction(Action):
-
-
-    pass
-
-
-class StripsAction:
-    pass
+    def __str__(self):
+        return "(:action {}\n:parameters ({})\n:precondition {}\n:effect {})".format(
+                self._name, " ".join(map(str, self._parameters)),
+                self._precondition, self._effect)
 
 
 ####################
