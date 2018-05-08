@@ -3,15 +3,61 @@ from ..pddl import *
 
 
 def main():
-    p = Predicate("on", ("?x", "block"), ("?y", "block"))
-    p = Predicate("empty-hand")
-    p = Function("on", ("?x", "block"))
-    print(p.is_ground())
-    print(p)
-    print(Constant(6))
-    print(Compound("forall", ObjectList(("?x", "block")), Predicate("clean","?x")))
-    # e = ArithmeticQuery("+", ConstantQuery(5),
-            # ArithmeticQuery("*", ConstantQuery(7), ConstantQuery(3)))
+    name = "hanoi"
+    requirements = [":strips"]
+    types = ["disk", "peg"]
+    predicates = [
+            Predicate("clear", ("?o", "object")),
+            Predicate("on", ("?d", "disk"), ("?o", "object")),
+            Predicate("smaller", ("?d", "disk"), ("?o", "object")),
+    ]
+    actions = [
+        Action("move",
+            ObjectList(("?from", "object"), ("?to", "object"), ("?what", "disk")),
+            AndQuery(
+                PredicateQuery(Predicate("clear", "?to")),
+                PredicateQuery(Predicate("clear", "?what")),
+                PredicateQuery(Predicate("smaller", "?what", "?to")),
+                PredicateQuery(Predicate("on", "?what", "?from")),
+            ),
+            AndEffect(
+                AddEffect(Predicate("on", "?what", "?to")),
+                AddEffect(Predicate("clear", "?from")),
+                DeleteEffect(Predicate("on", "?what", "?from")),
+                DeleteEffect(Predicate("clear", "?to")),
+            )
+        )
+    ]
+
+    domain = Domain(name, requirements, types, predicates, None, actions)
+    print(domain)
+    print(" ".join(str(p) for p in domain.get_static_predicates()))
+    print(" ".join(str(p) for p in domain.get_static_functions()))
+
+    # p = Predicate("on", ("?x", "block"), ("?y", "block"))
+    # p = Predicate("empty-hand")
+    # p = Function("on", ("?x", "block"))
+    # q = Function("on", "?x")
+    # print(hash(p))
+    # print(hash(q))
+    # print(p == q)
+    # print(p.is_ground())
+    # print(p)
+    # print(Constant(6))
+    # print(ForallQuery(ObjectList(("?x", "block")), Predicate("clean","?x")))
+    # print(ProbabilisticEffect(
+        # (0.3, AndEffect(AddEffect(Predicate("p", "?x")), AddEffect(Predicate("q", "?x", "?y")))),
+        # (0.2, AddEffect(Predicate("q", "?y", "?x"))))
+    # )
+    # e = ArithmeticQuery("+", Constant(5),
+            # ArithmeticQuery("*", Constant(7), Constant(3)))
+    # print(e)
+    # print(e.eval(None))
+
+    # print(type_hierarchy_to_str(to_type_hierarchy(
+        # {"block": "object", "table": "furniture", "furniture": "thing", "couch": "furniture"})))
+    # h = to_type_hierarchy({"block": "object", "table": "furniture", "furniture": "thing", "couch": "furniture"})
+    # print(inferred_types(h, "table"))
     # print(e)
     # print(e.eval(None))
     # comp = ComparisonQuery(">", e, ConstantQuery(25))
