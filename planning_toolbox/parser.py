@@ -3,6 +3,8 @@
 import re
 import io
 
+from . import pddl
+
 
 COMMENTS_RE = re.compile(";.*$", re.MULTILINE)
 FRACTION_RE = re.compile("[0-9]+/[0-9]+")
@@ -94,6 +96,40 @@ def parse(text):
     tokens.reverse()
     syntax_tree = read_from_tokens(tokens)
     return syntax_tree
+
+
+def process_predicate(tree):
+    pass
+
+
+def process_types(tree):
+    hierarchy = {}
+    acc = []
+    is_parent = False
+    for e in tree[1:]:
+        if is_parent:
+            for t in acc: hierarchy[t] = e
+            is_parent = False
+            del acc[:]
+        elif e == "-": is_parent = True
+        else: acc.append(e)
+    for t in acc: hierarchy[t] = None
+    return pddl.to_type_hierarchy(hierarchy)
+
+
+def process_domain(tree):
+    domain = pddl.Domain(tree[1][1])
+    requirements = tree[2][1:]
+    for e in tree[3:]:
+        if e[0] == ":types":
+            domain.type_hierarchy = process_types(e)
+        elif e[0] == ":predicates":
+            pass
+        elif e[0] == ":functions":
+            pass
+        elif e[0] == ":action":
+            pass
+    return domain
 
 
 def print_syntax_tree(tree, prefix="", last=False):

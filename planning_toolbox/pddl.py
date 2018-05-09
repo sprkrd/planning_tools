@@ -42,13 +42,13 @@ class ObjectList:
         self.objects = tuple(to_object(obj) for obj in objects)
 
     def bind(self, sigma):
-        return ObjectList(obj.bind(sigma) for obj in self.objects)
+        return ObjectList(*(obj.bind(sigma) for obj in self.objects))
 
     def is_ground(self):
         return all(o.is_ground for o in self.objects)
 
     def strip_types(self):
-        return ObjectList(Object(obj.name) for obj in self.objects)
+        return ObjectList(*(Object(obj.name) for obj in self.objects))
 
     def __iter__(self):
         return self.objects.__iter__()
@@ -263,7 +263,7 @@ class AndQuery(Query):
         return all(a.eval(state) for a in self.queries)
 
     def bind(self, sigma):
-        return AndQuery(a.bind(sigma) for a in self.queries)
+        return AndQuery(*(a.bind(sigma) for a in self.queries))
 
     def __str__(self):
         return lisp_list_to_str("and", *self.queries)
@@ -278,7 +278,7 @@ class OrQuery(Query):
         return any(a.eval(state) for a in self.queries)
 
     def bind(self, sigma):
-        return OrQuery(a.bind(sigma) for a in self.queries)
+        return OrQuery(*(a.bind(sigma) for a in self.queries))
 
     def __str__(self):
         return lisp_list_to_str("or", *self.queries)
@@ -438,7 +438,7 @@ class AndEffect(Effect):
         return out
 
     def bind(self, sigma):
-        return AndEffect(a.bind(sigma) for a in self.effects)
+        return AndEffect(*(a.bind(sigma) for a in self.effects))
 
     def modified_predicates(self):
         mp = set()
@@ -559,7 +559,7 @@ class ProbabilisticEffect(Effect):
         return out
 
     def bind(self, sigma):
-        return ProbabilisticEffect((p,e.bind(sigma)) for p, e in self.effects)
+        return ProbabilisticEffect(*((p,e.bind(sigma)) for p, e in self.effects))
 
     def modified_predicates(self):
         mp = set()
@@ -594,6 +594,10 @@ class Action:
 
     def apply(self, state):
         raise NotImplementedError()
+
+    def bind(self, sigma):
+        return Action(self.name, self.parameters.bind(sigma),
+                self.precondition.bind(sigma), self.effect.bind(sigma))
 
     def modified_predicates(self):
         return self.effect.modified_predicates()
@@ -635,7 +639,6 @@ class Domain:
             modifiable_functions.update(a.modified_functions())
         return get_static_functionals(self.functions, modifiable_functions)
 
-
     def __str__(self):
         ret = "(define (domain " + self.name + ")\n\n"
         if self.requirements is not None:
@@ -667,12 +670,12 @@ def to_object(obj):
 
 def to_type_hierarchy(types):
     if isinstance(types, (list, tuple)):
-        return {t: "object" for t in types}
+        return {t: None for t in types}
     elif isinstance(types, dict):
-        hierarchy = {c: "object" if p is None else p for c,p in types.items()}
+        hierarchy = types.copy()
         for p in types.values():
-            if p not in hierarchy and p != "object":
-                hierarchy[p] = "object"
+            if p not in hierarchy and p != "object" and p is not None:
+                hierarchy[p] = None
         return hierarchy
     raise Exception("wrong type")
 
@@ -693,19 +696,17 @@ def type_hierarchy_to_str(hierarchy):
     for p,cs in reverse_dict.items():
         if not first: s += "\n"
         s += " ".join(cs)
-        if p != "object":
-            s += " - " + p
+        if p is not None: s += " - " + p
         first = False
     return s
 
 
 def inferred_types(hierarchy, type_):
-    if type_ is None:
-        return ["object"]
-    inferred = [type_]
-    while type_ != "object":
-        type_ = hierarchy[type_]
+    inferred = []
+    while type_ is not None and type_ != "object":
         inferred.append(type_)
+        type_ = hierarchy[type_]
+    inferred.append("object") # every type is descendent of object
     return inferred
 
 
@@ -714,6 +715,7 @@ def get_functional_by_name(functionals, name):
         for f in famunctionals:
             if f.name == name: return f
     raise ValueError("There is no functional with name " + name)
+
 
 def get_static_functionals(functionals, modifiable):
     static_functionals = []

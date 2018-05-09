@@ -31,8 +31,10 @@ def main():
 
     domain = Domain(name, requirements, types, predicates, None, actions)
     print(domain)
-    print(" ".join(str(p) for p in domain.get_static_predicates()))
-    print(" ".join(str(p) for p in domain.get_static_functions()))
+    # print(" ".join(str(p) for p in domain.get_static_predicates()))
+    # print(" ".join(str(p) for p in domain.get_static_functions()))
+
+    # print(actions[0].bind({"?from": "a", "?to": "c", "?what": "b"}))
 
     # p = Predicate("on", ("?x", "block"), ("?y", "block"))
     # p = Predicate("empty-hand")
@@ -54,10 +56,10 @@ def main():
     # print(e)
     # print(e.eval(None))
 
-    # print(type_hierarchy_to_str(to_type_hierarchy(
-        # {"block": "object", "table": "furniture", "furniture": "thing", "couch": "furniture"})))
-    # h = to_type_hierarchy({"block": "object", "table": "furniture", "furniture": "thing", "couch": "furniture"})
-    # print(inferred_types(h, "table"))
+    print(type_hierarchy_to_str(to_type_hierarchy(
+        {"block": None, "table": "furniture", "furniture": "thing", "couch": "furniture"})))
+    h = to_type_hierarchy({"block": "object", "table": "furniture", "furniture": "thing", "couch": "furniture"})
+    print(inferred_types(h, "table"))
     # print(e)
     # print(e.eval(None))
     # comp = ComparisonQuery(">", e, ConstantQuery(25))
