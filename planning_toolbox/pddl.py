@@ -606,7 +606,7 @@ class Action:
         return self.effect.modified_functions()
 
     def __str__(self):
-        return "(:action {}\n:parameters ({})\n:precondition {}\n:effect {})".format(
+        return "(:action {}\n  :parameters ({})\n  :precondition {}\n  :effect {}\n)".format(
                 self.name, self.parameters, self.precondition, self.effect)
 
 
@@ -646,11 +646,12 @@ class Domain:
         if self.type_hierarchy is not None:
             ret += "(:types " + type_hierarchy_to_str(self.type_hierarchy) + ")\n\n"
         if self.predicates is not None:
-            ret += "(:predicates " + "\n".join(str(p) for p in self.predicates) + ")\n\n"
+            ret += "(:predicates\n  " + "\n  ".join(str(p) for p in self.predicates) + "\n)\n\n"
         if self.functions is not None:
             ret += "(:functions " + "\n".join(str(f) + ((" - " + t) if t else "") for f,t in self.functions.items()) + ")\n\n"            
-        ret += "\n\n".join(map(str, self.actions))
-        ret += "\n)"
+        if self.actions is not None:
+            ret += "\n\n".join(map(str, self.actions))
+        ret += ")"
         return ret
 
 

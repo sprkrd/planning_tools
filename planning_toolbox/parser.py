@@ -15,23 +15,20 @@ class SyntaxTree:
     def __init__(self, node):
         if isinstance(node, (list, tuple)):
            assert all(isinstance(tree, SyntaxTree) for tree in node)
-        self._node = node
+        self.node = node
 
     def is_atom(self):
-        return not isinstance(self._node, (list, tuple))
+        return not isinstance(self.node, (list, tuple))
 
     def is_symbol(self):
-        return isinstance(self._node, str)
+        return isinstance(self.node, str)
 
     def is_number(self):
-        return isinstance(self._node, (int, float))
-
-    def node(self):
-        return self._node
+        return isinstance(self.node, (int, float))
 
     def _str_repr(self, output, prefix="", last=False):
         if self.is_atom():
-            print(prefix + str(self._node), file=output)
+            print(prefix + str(self.node), file=output)
         else:
             print(prefix + "[]", file=output)
             if prefix:
@@ -42,12 +39,13 @@ class SyntaxTree:
                 nst._str_repr(output, nst_prefix, idx==len(self)-1)
 
     def __iter__(self):
-        assert not self.is_atom()
-        return self._node.__iter__()
+        return self.node.__iter__()
 
     def __len__(self):
-        assert not self.is_atom()
-        return len(self._node)
+        return len(self.node)
+
+    def __getitem__(self, val):
+        return SyntaxTree(self.node[val]) if isinstance(val, slice) else self.node[val]
 
     def __str__(self):
         output = io.StringIO()
@@ -98,36 +96,62 @@ def parse(text):
     return syntax_tree
 
 
-def process_predicate(tree):
-    pass
-
-
 def process_types(tree):
     hierarchy = {}
     acc = []
     is_parent = False
     for e in tree[1:]:
         if is_parent:
-            for t in acc: hierarchy[t] = e
+            for t in acc: hierarchy[t] = e.node
             is_parent = False
             del acc[:]
-        elif e == "-": is_parent = True
-        else: acc.append(e)
+        elif e.node == "-": is_parent = True
+        else: acc.append(e.node)
     for t in acc: hierarchy[t] = None
     return pddl.to_type_hierarchy(hierarchy)
 
 
+def process_objects(tree):
+    objects = []
+    acc = []
+    is_type = False
+    for e in tree:
+        if is_type:
+            objects += [(o, e.node) for o in acc]
+            is_type = False
+            acc = []
+        elif e.node == "-": is_type = True
+        else: acc.append(e.node)
+    objects += acc
+    return objects
+
+
+def process_predicate(tree):
+    name = tree[0].node
+    args = process_objects(tree[1:])
+    return pddl.Predicate(name, *args)
+
+
+def process_functions(tree):
+    is_type = False
+    for e in tree:
+        if is_type:
+            pass
+
+
+
 def process_domain(tree):
     domain = pddl.Domain(tree[1][1])
-    requirements = tree[2][1:]
+    domain.name = tree[1][1].node
+    domain.requirements = [e.node for e in tree[2][1:]]
     for e in tree[3:]:
-        if e[0] == ":types":
+        if e[0].node == ":types":
             domain.type_hierarchy = process_types(e)
-        elif e[0] == ":predicates":
-            pass
-        elif e[0] == ":functions":
-            pass
-        elif e[0] == ":action":
+        elif e[0].node == ":predicates":
+            domain.predicates = [process_predicate(p) for p in e[1:]]
+        elif e[0].node == ":functions":
+            raise NotImplementedError(i)
+        elif e[0].node == ":action":
             pass
     return domain
 

@@ -1,5 +1,5 @@
 import argparse
-from ..parser import parse, print_syntax_tree
+from ..parser import *
 
 
 def main(filepath):
@@ -7,6 +7,8 @@ def main(filepath):
         text = f.read()
     tree = parse(text)
     print(tree)
+    d = process_domain(tree)
+    print(d)
 
 
 if __name__ == "__main__":
