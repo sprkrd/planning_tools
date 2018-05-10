@@ -648,7 +648,7 @@ class Domain:
         if self.predicates is not None:
             ret += "(:predicates\n  " + "\n  ".join(str(p) for p in self.predicates) + "\n)\n\n"
         if self.functions is not None:
-            ret += "(:functions " + "\n".join(str(f) + ((" - " + t) if t else "") for f,t in self.functions.items()) + ")\n\n"            
+            ret += "(:functions " + "\n".join(str(f) for f in self.functions) + ")\n\n"            
         if self.actions is not None:
             ret += "\n\n".join(map(str, self.actions))
         ret += ")"

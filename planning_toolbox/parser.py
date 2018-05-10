@@ -133,11 +133,27 @@ def process_predicate(tree):
 
 
 def process_functions(tree):
+    print(tree)
+    functions = []
     is_type = False
-    for e in tree:
+    acc = []
+    for e in tree[1:]:
         if is_type:
-            pass
+            for f in acc: f.type = e.node
+            functions += acc
+            acc = []
+            is_type = False
+        elif e.node == "-": is_type = True
+        else:
+            name = e[0].node
+            args = process_objects(e[1:])
+            acc.append(pddl.Function(name, *args))
+    functions += acc
+    return functions
 
+
+def process_action(tree):
+    pass
 
 
 def process_domain(tree):
@@ -150,7 +166,7 @@ def process_domain(tree):
         elif e[0].node == ":predicates":
             domain.predicates = [process_predicate(p) for p in e[1:]]
         elif e[0].node == ":functions":
-            raise NotImplementedError(i)
+            domain.functions = process_functions(e)
         elif e[0].node == ":action":
             pass
     return domain
