@@ -44,6 +44,9 @@ class SyntaxTree:
     def __len__(self):
         return len(self.node)
 
+    def __bool__(self):
+        return bool(self.node)
+
     def __getitem__(self, val):
         return SyntaxTree(self.node[val]) if isinstance(val, slice) else self.node[val]
 
@@ -123,17 +126,17 @@ def process_objects(tree):
         elif e.node == "-": is_type = True
         else: acc.append(e.node)
     objects += acc
-    return objects
+    return pddl.ObjectList(*objects)
 
 
-def process_predicate(tree):
+def process_functional(tree, predicate=True):
     name = tree[0].node
-    args = process_objects(tree[1:])
-    return pddl.Predicate(name, *args)
+    objlist = process_objects(tree[1:])
+    class_ = pddl.Predicate if predicate else pddl.Function
+    return class_(name, objlist)
 
 
 def process_functions(tree):
-    print(tree)
     functions = []
     is_type = False
     acc = []
@@ -144,31 +147,119 @@ def process_functions(tree):
             acc = []
             is_type = False
         elif e.node == "-": is_type = True
-        else:
-            name = e[0].node
-            args = process_objects(e[1:])
-            acc.append(pddl.Function(name, *args))
+        else: acc.append(process_functional(e, False))
     functions += acc
     return functions
 
 
-def process_action(tree):
-    pass
+def process_query(tree, domain):
+    def is_predicate_symbol(tree):
+        if tree[0].node == "=":
+            ret = ":equality" in domain.requirements or ":adl" in domain.requirements
+            ret = ret and tree[1].is_symbol() and tree[2].is_symbol()
+            ret = ret and tree[1].node not in (f.name for f in domain.functions)
+            ret = ret and tree[2].node not in (f.name for f in domain.functions)
+            return ret
+        return tree[0].node in (p.name for p in domain.predicates)
+    def is_function_symbol(tree):
+        if tree[0].node == "reward" and ":rewards" in domain.requirements:
+            return True
+        return tree[0].node in (f.name for f in domain.functions)
+    query = None
+    if not tree:
+        query = pddl.EmptyQuery()
+    elif tree.is_number():
+        query = pddl.Constant(tree.node)
+    elif is_predicate_symbol(tree):
+        query = pddl.PredicateQuery(process_functional(tree))
+    elif is_function_symbol(tree):
+        query = pddl.FunctionQuery(process_functional(tree, False))
+    elif tree[0].node in pddl.ArithmeticQuery.OPERATORS:
+        lhs = process_query(tree[1], domain)
+        rhs = process_query(tree[2], domain)
+        query = pddl.ArithmeticQuery(tree[0].node, lhs, rhs)
+    elif tree[0].node in pddl.ComparisonQuery.OPERATORS:
+        lhs = process_query(tree[1], domain)
+        rhs = process_query(tree[2], domain)
+        query = pddl.ComparisonQuery(tree[0].node, lhs, rhs)
+    elif tree[0].node == "and":
+        query = pddl.AndQuery(*(process_query(e, domain) for e in tree[1:]))
+    elif tree[0].node == "or":
+        query = pddl.OrQuery(*(process_query(e, domain) for e in tree[1:]))
+    elif tree[0].node == "not":
+        query = pddl.NotQuery(process_query(tree[1], domain))
+    elif tree[0].node == "imply":
+        lhs = process_query(tree[1], domain)
+        rhs = process_query(tree[2], domain)
+        query = pddl.ImplyQuery(lhs, rhs)
+    elif tree[0].node == "forall":
+        params = process_objects(tree[1])
+        innerq = process_query(tree[2], domain)
+        query = pddl.ForallQuery(params, innerq)
+    elif tree[0].node == "exists":
+        params = process_objects(tree[1])
+        innerq = process_query(tree[2], domain)
+        query = pddl.ExistsQuery(params, innerq)
+    else:
+        raise Exception("Cannot process tree:\n" + str(tree))
+    return query
+
+
+def process_effect(tree, domain):
+    effect = None
+    if not tree:
+        effect = pddl.EmptyEffect()
+    elif tree[0].node in (p.name for p in domain.predicates):
+        effect = pddl.AddEffect(process_functional(tree))
+    elif tree[0].node == "not":
+        effect = pddl.DeleteEffect(process_functional(tree[1]))
+    elif tree[0].node == "and":
+        effect = pddl.AndEffect(*(process_effect(e, domain) for e in tree[1:]))
+    elif tree[0].node == "forall":
+        params = process_objects(tree[1])
+        innere = process_effect(tree[2], domain)
+        effect = pddl.ForallEffect(params, innere)
+    elif tree[0].node == "when":
+        lhs = process_query(tree[1], domain)
+        rhs = process_effect(tree[2], domain)
+        effect = pddl.ConditionalEffect(lhs, rhs)
+    elif tree[0].node in pddl.AssignmentEffect.OPERATORS:
+        lhs = process_functional(tree[1], False)
+        rhs = process_query(tree[2], domain)
+        effect = pddl.AssignmentEffect(tree[0].node, lhs, rhs)
+    elif tree[0].node == "probabilistic":
+        effect = pddl.ProbabilisticEffect(*((p.node, process_effect(e, domain))
+            for p, e in zip(tree[1::2], tree[2::2])))
+    else:
+        raise Exception("Cannot process tree:\n" + str(tree))
+    return effect
+
+
+def process_action(tree, domain):
+    action = pddl.Action(tree[1].node)
+    # tree[2] is the :parameters keyword
+    action.parameters = process_objects(tree[3])
+    # tree[4] is the :precondition keyword
+    action.precondition = process_query(tree[5], domain)
+    # tree[6] is the :effect keyword
+    action.effect = process_effect(tree[7], domain)
+    return action
 
 
 def process_domain(tree):
-    domain = pddl.Domain(tree[1][1])
-    domain.name = tree[1][1].node
+    domain = pddl.Domain(tree[1][1].node)
     domain.requirements = [e.node for e in tree[2][1:]]
     for e in tree[3:]:
         if e[0].node == ":types":
             domain.type_hierarchy = process_types(e)
+        elif e[0].node == ":constants":
+            domain.constants = process_objects(e[1:])
         elif e[0].node == ":predicates":
-            domain.predicates = [process_predicate(p) for p in e[1:]]
+            domain.predicates = [process_functional(p) for p in e[1:]]
         elif e[0].node == ":functions":
             domain.functions = process_functions(e)
         elif e[0].node == ":action":
-            pass
+            domain.actions.append(process_action(e, domain))
     return domain
 
 

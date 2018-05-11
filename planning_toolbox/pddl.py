@@ -31,7 +31,7 @@ class Object:
         return other.name == self.name 
 
     def __str__(self):
-        if self.type is not None and not self.is_ground():
+        if self.type is not None:
             return self.name + " - " + self.type
         return self.name
 
@@ -48,7 +48,7 @@ class ObjectList:
         return all(o.is_ground for o in self.objects)
 
     def strip_types(self):
-        return ObjectList(*(Object(obj.name) for obj in self.objects))
+        return ObjectList(*(obj.strip_type() for obj in self.objects))
 
     def __iter__(self):
         return self.objects.__iter__()
@@ -75,7 +75,7 @@ class ObjectList:
             if not first: ret += " "
             ret += obj.name
             same_type = next_obj is not None and next_obj.type == obj.type
-            if obj.type and not obj.is_ground() and not same_type:
+            if obj.type and not same_type:
                 ret += " - " + obj.type
             first = False
         return ret
@@ -205,8 +205,10 @@ class Constant(Query):
 
 class ArithmeticQuery(Query):
 
+    OPERATORS = ("+", "-", "*", "/")
+
     def __init__(self, operator, lhs, rhs):
-        assert operator in ("+","-","*","/")
+        assert operator in ArithmeticQuery.OPERATORS
         self.operator = operator
         self.lhs = lhs
         self.rhs = rhs
@@ -230,8 +232,10 @@ class ArithmeticQuery(Query):
 
 class ComparisonQuery(Query):
 
+    OPERATORS = ("<", ">", "<=", "=", ">=")
+
     def __init__(self, comparison, lhs, rhs):
-        assert comparison in ("<", ">", "<=", "=", ">=")
+        assert comparison in ComparisonQuery.OPERATORS
         self.comparison = comparison
         self.lhs = lhs
         self.rhs = rhs
@@ -475,7 +479,7 @@ class ForallEffect(Effect):
         return self.effect.modified_functions()
 
     def __str__(self):
-        return "(forall ({}) {})".format(self.parameters, self.query)
+        return "(forall ({}) {})".format(self.parameters, self.effect)
 
 
 class ConditionalEffect(Effect):
@@ -506,8 +510,10 @@ class ConditionalEffect(Effect):
 
 class AssignmentEffect(Effect):
 
+    OPERATORS = ("assign", "increase", "decrease", "scale-up", "scale-down")
+
     def __init__(self, assignop, lhs, rhs):
-        assert assignop in ("assign", "increase", "decrease", "scale-up", "scale-down")
+        assert assignop in AssignmentEffect.OPERATORS
         self.assignop = assignop
         self.lhs = lhs
         self.rhs = rhs
@@ -583,7 +589,7 @@ class ProbabilisticEffect(Effect):
 
 class Action:
 
-    def __init__(self, name, parameters=None, precondition=None, effect=None):
+    def __init__(self, name="", parameters=None, precondition=None, effect=None):
         self.name = name
         self.parameters = ObjectList() if parameters is None else parameters
         self.precondition = EmptyQuery() if precondition is None else precondition
@@ -612,46 +618,62 @@ class Action:
 
 class Domain:
 
-    def __init__(self, name, requirements=None, types=None,
+    def __init__(self, name="", requirements=None, types=None, constants=None,
             predicates=None, functions=None, actions=None):
         self.name = name
-        self.requirements = requirements
-        self.type_hierarchy = None if types is None else to_type_hierarchy(types)
-        self.predicates = predicates
-        self.functions = functions 
-        self.actions = actions
+        self.requirements = [] if requirements is None else requirements
+        self.type_hierarchy = {} if types is None else to_type_hierarchy(types)
+        self.constants = [] if constants is None else constants
+        self.predicates = [] if predicates is None else predicates
+        self.functions = [] if functions is None else functions
+        self.actions = [] if actions is None else actions
 
-    def get_predicate_by_name(self, name):
-        return get_functional_by_name(self.predicates, name)
+    def allows_equality_predicate(self):
+        return ":equality" in self.requirements or ":adl" in self.requirements
 
-    def get_function_by_name(self, name):
-        return get_functional_by_name(self.functions, name)
+    def allows_reward_fluent(self):
+        return ":rewards" in self.requirements
+
+    def all_predicates(self):
+        allpred = self.predicates.copy()
+        if self.allows_equality_predicate():
+            allpred.append(Predicate("=", "?x", "?y"))
+        return allpred
+
+    def all_functions(self):
+        allfuncs = self.functions.copy()
+        if self.allows_reward_fluent():
+            allfuncs.append(Function("reward"))
+        return allfuncs
 
     def get_static_predicates(self):
-        modifiable_predicates = set()
+        modifiable = set()
         for a in self.actions:
-            modifiable_predicates.update(a.modified_predicates())
-        return get_static_functionals(self.predicates, modifiable_predicates)
+            modifiable.update(a.modified_predicates())
+        static = [p for p in self.all_predicates() if p.name not in modifiable]
+        return static
 
     def get_static_functions(self):
-        modifiable_functions = set()
+        modifiable = set()
+        # the reward fluent, if present, should be considered modifiable
+        modifiable.add("reward")
         for a in self.actions:
-            modifiable_functions.update(a.modified_functions())
-        return get_static_functionals(self.functions, modifiable_functions)
+            modifiable.update(a.modified_functions())
+        return [f for f in self.all_functions() if f.name not in modifiable]
 
     def __str__(self):
         ret = "(define (domain " + self.name + ")\n\n"
-        if self.requirements is not None:
+        if self.requirements:
             ret += "(:requirements " + " ".join(self.requirements) + ")\n\n"
-        if self.type_hierarchy is not None:
+        if self.type_hierarchy:
             ret += "(:types " + type_hierarchy_to_str(self.type_hierarchy) + ")\n\n"
-        if self.predicates is not None:
+        if self.constants:
+            ret += "(:constants " + str(self.constants) + ")\n\n"
+        if self.predicates:
             ret += "(:predicates\n  " + "\n  ".join(str(p) for p in self.predicates) + "\n)\n\n"
-        if self.functions is not None:
-            ret += "(:functions " + "\n".join(str(f) for f in self.functions) + ")\n\n"            
-        if self.actions is not None:
-            ret += "\n\n".join(map(str, self.actions))
-        ret += ")"
+        if self.functions:
+            ret += "(:functions " + "\n".join(str(f) + ((" - " + t) if t else "") for f,t in self.functions.items()) + ")\n\n"            
+        ret += "\n\n".join(map(str, self.actions)) + ")"
         return ret
 
 
@@ -709,20 +731,4 @@ def inferred_types(hierarchy, type_):
         type_ = hierarchy[type_]
     inferred.append("object") # every type is descendent of object
     return inferred
-
-
-def get_functional_by_name(functionals, name):
-    if functionals is not None:
-        for f in famunctionals:
-            if f.name == name: return f
-    raise ValueError("There is no functional with name " + name)
-
-
-def get_static_functionals(functionals, modifiable):
-    static_functionals = []
-    if functionals is not None:
-        for f in functionals:
-            if f.name not in modifiable:
-                static_functionals.append(f)
-    return static_functionals
 
