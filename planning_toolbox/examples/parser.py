@@ -6,8 +6,8 @@ def main(filepath):
     with open(filepath, "r") as f:
         text = f.read()
     tree = parse(text)
-    print(tree)
-    d = process_domain(tree)
+    print(treew
+    d = w_domain(tree)
     print(d)
 
 

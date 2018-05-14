@@ -263,6 +263,10 @@ def process_domain(tree):
     return domain
 
 
+def process_problem(tree):
+    pass
+
+
 def print_syntax_tree(tree, prefix="", last=False):
     if isinstance(tree, list):
         print(prefix + "[]")

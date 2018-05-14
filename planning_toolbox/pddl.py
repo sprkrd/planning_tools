@@ -677,6 +677,22 @@ class Domain:
         return ret
 
 
+class Problem:
+
+    def __init__(self, name="", domain=None, objects=None, init=None, goal=None,
+            goal_reward=None, metric=None):
+        self.name = name
+        self.domain = domain
+        self.objects = [] if objects is None else objects
+        self.init = [] if init is None else init
+        self.goal = goal
+        self.goal_reward = goal_reward
+
+
+    def __str__(self):
+        return ""
+
+
 ####################
 ## HELPER METHODS ##
 ####################
