@@ -264,7 +264,8 @@ def process_domain(tree):
 
 
 def process_problem(tree):
-    pass
+    problem = pddl.Problem(tree[1][1].node)
+    
 
 
 def print_syntax_tree(tree, prefix="", last=False):

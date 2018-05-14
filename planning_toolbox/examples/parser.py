@@ -6,9 +6,9 @@ def main(filepath):
     with open(filepath, "r") as f:
         text = f.read()
     tree = parse(text)
-    print(treew
-    d = w_domain(tree)
-    print(d)
+    print(tree)
+    # d = w_domain(tree)
+    # print(d)
 
 
 if __name__ == "__main__":

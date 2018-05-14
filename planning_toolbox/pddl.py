@@ -677,20 +677,40 @@ class Domain:
         return ret
 
 
+class Goal:
+
+    def __init__(self, query=None, reward=None, metric=None):
+        self.query = query
+        self.reward = reward
+        self.metric = metric
+
+    def __str__(self):
+        ret = ""
+        if self.query: ret += "(:goal {})\n".format(query)
+        if self.reward: ret += "(:goal-reward {})\n".format(self.reward)
+        if self.metric: ret += "(:metric {} {}\n)".format(*self.metric)
+        return ret
+
+
 class Problem:
 
-    def __init__(self, name="", domain=None, objects=None, init=None, goal=None,
-            goal_reward=None, metric=None):
+    def __init__(self, name="", domain=None, objects=None, init=None, goal=None):
         self.name = name
         self.domain = domain
-        self.objects = [] if objects is None else objects
+        self.objects = ObjectList() if objects is None else objects
         self.init = [] if init is None else init
-        self.goal = goal
-        self.goal_reward = goal_reward
+        self.goal = Goal(EmptyQuery()) if goal is None else goal
 
 
     def __str__(self):
-        return ""
+        ret = "(define (problem {})\n".format(self.name)
+        if self.domain is not None:
+            ret += "(:domain {})\n".format(self.domain.name)
+        ret += "(:objects {})\n".format(self.objects)
+        ret += "(:init\n" + "\n".join(str(p) for p in self.init) + ")\n"
+        ret += str(self.goal)
+        ret += ")"
+        return ret
 
 
 ####################
