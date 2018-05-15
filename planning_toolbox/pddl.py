@@ -544,15 +544,6 @@ class ProbabilisticEffect(Effect):
         assert total_prob < (1+1e-6)
         self.effects = effects
 
-    def __len__(self):
-        return len(self.effects)
-
-    def __getitem__(self, idx):
-        return self.effects[idx]
-
-    def __iter__(self):
-        return self.effects.__iter__()
-
     def apply(self, state, out=None):
         if out is None: out = state.copy()
         r = random()
@@ -578,6 +569,21 @@ class ProbabilisticEffect(Effect):
         for p, e in self.effects:
             mf.update(e.modified_predicates())
         return mf
+
+    def sum_to_one(self):
+        accprob = 0
+        for p, _ in self.effects:
+            accprob += p
+        return abs(accprob - 1) < 1e-6
+
+    def __len__(self):
+        return len(self.effects)
+
+    def __getitem__(self, idx):
+        return self.effects[idx]
+
+    def __iter__(self):
+        return self.effects.__iter__()
 
     def __str__(self):
         return "(probabilistic {})".format(" ".join(str(p)+" "+str(e) for p, e in self.effects))
@@ -686,9 +692,37 @@ class Goal:
 
     def __str__(self):
         ret = ""
-        if self.query: ret += "(:goal {})\n".format(query)
+        if self.query: ret += "(:goal {})\n".format(self.query)
         if self.reward: ret += "(:goal-reward {})\n".format(self.reward)
-        if self.metric: ret += "(:metric {} {}\n)".format(*self.metric)
+        if self.metric: ret += "(:metric {} {})\n".format(*self.metric)
+        return ret
+
+
+class InitialState:
+
+    def __init__(self, predicates=None, functions=None, probabilistic=None):
+        self.predicates = [] if predicates is None else predicates
+        self.functions = {} if functions is None else functions
+        self.probabilistic = [] if probabilistic is None else probabilistic
+
+    def get_state(self):
+        pass
+
+    def __str__(self):
+        ret = "(:init\n  "
+        ret += "\n  ".join(str(p) for p in self.predicates) + "\n"
+        for f,v in self.functions.items():
+            ret += "  (= {} {})\n".format(f, v)
+        for plist in self.probabilistic:
+            ret += "  (probabilistic"
+            for prob, v in plist:
+                ret += " " + str(prob)
+                if isinstance(v, (list, tuple)):
+                    ret += " " + "(and {})".format(" ".join(str(p) for p in v))
+                else:
+                    ret += " " + str(v)
+            ret += ")\n"
+        ret += ")\n"
         return ret
 
 
@@ -698,7 +732,7 @@ class Problem:
         self.name = name
         self.domain = domain
         self.objects = ObjectList() if objects is None else objects
-        self.init = [] if init is None else init
+        self.init = InitialState() if init is None else init
         self.goal = Goal(EmptyQuery()) if goal is None else goal
 
 
@@ -707,10 +741,16 @@ class Problem:
         if self.domain is not None:
             ret += "(:domain {})\n".format(self.domain.name)
         ret += "(:objects {})\n".format(self.objects)
-        ret += "(:init\n" + "\n".join(str(p) for p in self.init) + ")\n"
+        ret += str(self.init)
         ret += str(self.goal)
         ret += ")"
         return ret
+
+
+class State:
+
+    def __init__(self, predicates=None, functions=None, problem=None):
+        pass
 
 
 ####################

@@ -263,9 +263,39 @@ def process_domain(tree):
     return domain
 
 
-def process_problem(tree):
-    problem = pddl.Problem(tree[1][1].node)
-    
+def process_init(tree):
+    init = pddl.InitialState()
+    for e in tree:
+        if e[0].node == "=":
+            f = process_functional(e[1])
+            init.functions[f] = e[2].node
+        elif e[0].node == "probabilistic":
+            plist = []
+            for prob, elem in zip(e[1::2], e[2::2]):
+                if elem[0].node == "and":
+                    plist.append((prob.node, [process_functional(p) for p in elem[1:]]))
+                else:
+                    plist.append((prob.node, process_functional(elem)))
+            init.probabilistic.append(plist)
+        else:
+            init.predicates.append(process_functional(e))
+    return init
+
+
+def process_problem(tree, domain):
+    problem = pddl.Problem(tree[1][1].node, domain)
+    for e in tree[3:]:
+        if e[0].node == ":objects":
+            problem.objects = process_objects(e[1:])
+        elif e[0].node == ":init":
+            problem.init = process_init(e[1:])
+        elif e[0].node == ":goal":
+            problem.goal.query = process_query(e[1], domain)
+        elif e[0].node == ":goal-reward":
+            problem.goal.reward = e[1].node
+        elif e[0].node == ":metric":
+            problem.goal.metric = (e[1].node, process_query(e[2], domain))
+    return problem
 
 
 def print_syntax_tree(tree, prefix="", last=False):
