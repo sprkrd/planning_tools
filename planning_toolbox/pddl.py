@@ -2,7 +2,6 @@
 ## BASIC TYPES ##
 #################
 
-from copy import copy
 from random import random
 
 
