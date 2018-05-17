@@ -651,6 +651,16 @@ class Domain:
             allfuncs.append(Function("reward"))
         return allfuncs
 
+    def retrieve_action(self, name, *args):
+        action = None
+        for a in self.actions:
+            if a.name == name:
+                action = a
+                if args:
+                    action = a.bind({param.name: arg
+                        for param,arg in zip(a.parameters, args)})
+        return action
+
     def get_static_predicates(self):
         modifiable = set()
         for a in self.actions:

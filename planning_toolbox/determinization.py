@@ -5,7 +5,23 @@ from functools import reduce
 from itertools import product
 
 
+class Determinizer:
+    pass
+
+
+class AllOutcomeDeterminizer(Determinizer):
+    pass
+
+
+class SingleOutcomeDeterminizer(Determinizer):
+    pass
+
+
 def all_outcome_determinization(problem):
+    pass
+
+
+def single_outcome_determinization(problem):
     pass
 
 
