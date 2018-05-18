@@ -9,7 +9,6 @@ def all_outcome_determinization(domain):
     determinized = expand_domain(domain)
     actions = []
     for a in determinized.actions:
-        print(a)
         for idx, (_, e) in enumerate(a.effect):
             anew = a.copy()
             anew.name = anew.name + "_o" + str(idx)
