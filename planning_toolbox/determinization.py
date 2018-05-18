@@ -5,20 +5,18 @@ from functools import reduce
 from itertools import product
 
 
-class Determinizer:
-    pass
-
-
-class AllOutcomeDeterminizer(Determinizer):
-    pass
-
-
-class SingleOutcomeDeterminizer(Determinizer):
-    pass
-
-
-def all_outcome_determinization(problem):
-    pass
+def all_outcome_determinization(domain):
+    determinized = expand_domain(domain)
+    actions = []
+    for a in determinized.actions:
+        print(a)
+        for idx, (_, e) in enumerate(a.effect):
+            anew = a.copy()
+            anew.name = anew.name + "_o" + str(idx)
+            anew.effect = e
+            actions.append(anew)
+    determinized.actions = actions
+    return determinized
 
 
 def single_outcome_determinization(problem):
@@ -29,14 +27,14 @@ def single_outcome_determinization(problem):
 # UTILITIES #
 #############
 
-BASE_EFFECTS = [
+BASE_EFFECTS = (
     EmptyEffect,
     AddEffect,
     DeleteEffect,
     ForallEffect,
     ConditionalEffect,
     AssignmentEffect,
-]
+)
 
 
 def expand_probabilistic_effects(effect):
@@ -68,4 +66,18 @@ def expand_probabilistic_effects(effect):
     return outcomes
 
 
+def expand_probabilistic_actions(actions):
+    expanded = []
+    for a in actions:
+        peffect = ProbabilisticEffect(*expand_probabilistic_effects(a.effect))
+        aexpanded = a.copy()
+        aexpanded.effect = peffect
+        expanded.append(aexpanded)
+    return expanded
+
+
+def expand_domain(domain):
+    expanded = domain.copy()
+    expanded.actions = expand_probabilistic_actions(domain.actions)
+    return expanded
 

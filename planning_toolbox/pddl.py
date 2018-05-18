@@ -2,6 +2,7 @@
 ## BASIC TYPES ##
 #################
 
+from copy   import copy
 from random import random
 
 
@@ -432,7 +433,7 @@ class DeleteEffect(Effect):
 class AndEffect(Effect):
 
     def __init__(self, *effects):
-        self.effects = effects
+        self.effects = [e for e in effects if not isinstance(e, EmptyEffect)]
 
     def apply(self, state, out=None):
         if out is None: out = state.copy()
@@ -454,6 +455,9 @@ class AndEffect(Effect):
         for e in self.effects:
             mf.update(e.modified_functions())
         return mf
+
+    def __len__(self):
+        return len(self.effects)
 
     def __str__(self):
         return lisp_list_to_str("and", *self.effects)
@@ -610,6 +614,9 @@ class Action:
         return Action(self.name, self.parameters.bind(sigma),
                 self.precondition.bind(sigma), self.effect.bind(sigma))
 
+    def copy(self):
+        return copy(self)
+
     def modified_predicates(self):
         return self.effect.modified_predicates()
 
@@ -675,6 +682,17 @@ class Domain:
         for a in self.actions:
             modifiable.update(a.modified_functions())
         return [f for f in self.all_functions() if f.name not in modifiable]
+
+    def copy(self):
+        return Domain(
+                name=self.name,
+                requirements=self.requirements.copy(),
+                types=self.type_hierarchy.copy(),
+                constants=self.constants.copy(),
+                predicates=self.predicates.copy(),
+                functions=self.functions.copy(),
+                actions=self.actions.copy()
+        )
 
     def __str__(self):
         ret = "(define (domain " + self.name + ")\n\n"
@@ -743,7 +761,6 @@ class Problem:
         self.objects = ObjectList() if objects is None else objects
         self.init = InitialState() if init is None else init
         self.goal = Goal(EmptyQuery()) if goal is None else goal
-
 
     def __str__(self):
         ret = "(define (problem {})\n".format(self.name)

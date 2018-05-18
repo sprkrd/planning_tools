@@ -12,11 +12,15 @@ def main(domainpath): #, problempath):
         # text = f.read()
         # tree = parse(text)
         # problem = process_problem(tree, domain)
+    determinized = all_outcome_determinization(domain)
+    print(determinized)
     print(domain)
     # print(domain.actions[0])
-    expanded = expand_probabilistic_effects(domain.actions[0].effect)
-    for prob, e in expanded:
-        print("{} -> {}".format(prob, e))
+    # expanded = expand_probabilistic_actions(domain.actions)
+    # for a in expanded:
+        # print(a)
+    # for prob, e in expanded:
+        # print("{} -> {}".format(prob, e))
     # print(problem)
 
 
