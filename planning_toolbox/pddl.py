@@ -2,7 +2,7 @@
 ## BASIC TYPES ##
 #################
 
-from copy   import copy
+from copy   import deepcopy
 from random import random
 
 
@@ -20,6 +20,9 @@ class Object:
             return Object(sigma[self.name], self.type)
         except KeyError:
             return self
+
+    def copy(self):
+        return deepcopy(self)
 
     def strip_type(self):
         return Object(self.name)
@@ -39,10 +42,13 @@ class Object:
 class ObjectList:
 
     def __init__(self, *objects):
-        self.objects = tuple(to_object(obj) for obj in objects)
+        self.objects = [to_object(obj) for obj in objects]
 
     def bind(self, sigma):
         return ObjectList(*(obj.bind(sigma) for obj in self.objects))
+
+    def copy(self):
+        return deepcopy(self)
 
     def is_ground(self):
         return all(o.is_ground for o in self.objects)
@@ -92,6 +98,9 @@ class Functional:
 
     def arity(self):
         return len(self.arguments)
+
+    def copy(self):
+        return deepcopy(self)
 
     def is_ground(self):
         return self.arguments.is_ground()
@@ -145,6 +154,9 @@ class Query:
     def bind(self, sigma):
         raise NotImplementedError()
 
+    def copy(self):
+        return deepcopy(self)
+
 
 class EmptyQuery(Query):
     
@@ -155,7 +167,7 @@ class EmptyQuery(Query):
         return self
 
     def __str__(self):
-        return "()"
+        return "(and)"
 
 
 class PredicateQuery(Query):
@@ -261,7 +273,7 @@ class ComparisonQuery(Query):
 class AndQuery(Query):
 
     def __init__(self, *queries):
-        self.queries = queries
+        self.queries = list(queries)
 
     def eval(self, state):
         return all(a.eval(state) for a in self.queries)
@@ -276,7 +288,7 @@ class AndQuery(Query):
 class OrQuery(Query):
 
     def __init__(self, *queries):
-        self.args = queries
+        self.args = list(queries)
 
     def eval(self, state):
         return any(a.eval(state) for a in self.queries)
@@ -363,6 +375,9 @@ class Effect:
     def bind(self, sigma):
         raise NotImplementedError()
 
+    def copy(self):
+        return deepcopy(self)
+
     def modified_predicates(self):
         raise NotImplementedError()
 
@@ -385,7 +400,7 @@ class EmptyEffect(Effect):
         return set()
 
     def __str__(self):
-        return "()"
+        return "(and)"
 
 
 class AddEffect(Effect):
@@ -433,6 +448,7 @@ class DeleteEffect(Effect):
 class AndEffect(Effect):
 
     def __init__(self, *effects):
+        # self.effects = list(effects)
         self.effects = [e for e in effects if not isinstance(e, EmptyEffect)]
 
     def apply(self, state, out=None):
@@ -545,7 +561,10 @@ class ProbabilisticEffect(Effect):
         for p, _ in effects:
             total_prob += p
         assert total_prob < (1+1e-6)
-        self.effects = effects
+        self.effects = list(effects)
+        # self.effects = [e for e in effects
+                # if not isinstance(e,EmptyEffect) and not
+                # (isinstance(e,AndEffect) and len(e.effects) == 0)]
 
     def apply(self, state, out=None):
         if out is None: out = state.copy()
@@ -615,7 +634,7 @@ class Action:
                 self.precondition.bind(sigma), self.effect.bind(sigma))
 
     def copy(self):
-        return copy(self)
+        return deepcopy(self)
 
     def modified_predicates(self):
         return self.effect.modified_predicates()
@@ -644,7 +663,7 @@ class Domain:
         return ":equality" in self.requirements or ":adl" in self.requirements
 
     def allows_reward_fluent(self):
-        return ":rewards" in self.requirements
+        return ":rewards" in self.requirements or ":mdp" in self.requirements
 
     def all_predicates(self):
         allpred = self.predicates.copy()
@@ -684,15 +703,7 @@ class Domain:
         return [f for f in self.all_functions() if f.name not in modifiable]
 
     def copy(self):
-        return Domain(
-                name=self.name,
-                requirements=self.requirements.copy(),
-                types=self.type_hierarchy.copy(),
-                constants=self.constants.copy(),
-                predicates=self.predicates.copy(),
-                functions=self.functions.copy(),
-                actions=self.actions.copy()
-        )
+        return deepcopy(self)
 
     def __str__(self):
         ret = "(define (domain " + self.name + ")\n\n"
@@ -705,7 +716,7 @@ class Domain:
         if self.predicates:
             ret += "(:predicates\n  " + "\n  ".join(str(p) for p in self.predicates) + "\n)\n\n"
         if self.functions:
-            ret += "(:functions " + "\n".join(str(f) + ((" - " + t) if t else "") for f,t in self.functions.items()) + ")\n\n"            
+            ret += "(:functions " + "\n".join(str(f) for f in self.functions) + ")\n\n"            
         ret += "\n\n".join(map(str, self.actions)) + ")"
         return ret
 
@@ -716,6 +727,9 @@ class Goal:
         self.query = query
         self.reward = reward
         self.metric = metric
+
+    def copy(self):
+        return deepcopy(self)
 
     def __str__(self):
         ret = ""
@@ -731,6 +745,9 @@ class InitialState:
         self.predicates = [] if predicates is None else predicates
         self.functions = {} if functions is None else functions
         self.probabilistic = [] if probabilistic is None else probabilistic
+
+    def copy(self):
+        return deepcopy(self)
 
     def get_state(self):
         pass
@@ -761,6 +778,9 @@ class Problem:
         self.objects = ObjectList() if objects is None else objects
         self.init = InitialState() if init is None else init
         self.goal = Goal(EmptyQuery()) if goal is None else goal
+
+    def copy(self):
+        return deepcopy(self)
 
     def __str__(self):
         ret = "(define (problem {})\n".format(self.name)

@@ -12,11 +12,15 @@ def main(domainpath): #, problempath):
         # text = f.read()
         # tree = parse(text)
         # problem = process_problem(tree, domain)
-    determinized = all_outcome_determinization(domain)
+    # determinized = all_outcome_determinization(domain)
+    determinized = single_outcome_determinization(domain, "mlo")
     print(determinized)
     print(domain)
     # print(domain.actions[0])
     # expanded = expand_probabilistic_actions(domain.actions)
+    # pdomain = remove_mdp_features(preprocess_domain(domain))
+    # print(pdomain)
+    # print(domain)
     # for a in expanded:
         # print(a)
     # for prob, e in expanded:
