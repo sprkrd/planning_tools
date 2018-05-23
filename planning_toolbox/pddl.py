@@ -154,6 +154,12 @@ class Query:
     def bind(self, sigma):
         raise NotImplementedError()
 
+    def is_empty(self):
+        raise NotImplementedError()
+
+    def simplify(self):
+        raise NotImplementedError()
+
     def copy(self):
         return deepcopy(self)
 
@@ -164,6 +170,12 @@ class EmptyQuery(Query):
         return True
 
     def bind(self, sigma):
+        return self
+
+    def is_empty(self):
+        return True
+
+    def simplify(self):
         return self
 
     def __str__(self):
@@ -181,6 +193,12 @@ class PredicateQuery(Query):
     def bind(self, sigma):
         return PredicateQuery(self.predicate.bind(sigma))
 
+    def is_empty(self):
+        return False
+
+    def simplify(self):
+        return self
+
     def __str__(self):
         return str(self.predicate)
 
@@ -196,6 +214,12 @@ class FunctionQuery(Query):
     def bind(self, sigma):
         return FunctionQuery(self.function.bind(sigma))
 
+    def is_empty(self):
+        return False
+
+    def simplify(self):
+        return self
+
     def __str__(self):
         return str(self.function)
 
@@ -209,6 +233,12 @@ class Constant(Query):
         return self.constant
 
     def bind(self, sigma):
+        return self
+
+    def is_empty(self):
+        return False
+
+    def simplify(self):
         return self
 
     def __str__(self):
@@ -238,6 +268,12 @@ class ArithmeticQuery(Query):
         return ArithmeticQuery(self.operator, self.lhs.bind(sigma),
                 self.rhs.bind(sigma))
 
+    def is_empty(self):
+        return False
+
+    def simplify(self):
+        return self
+
     def __str__(self):
         return lisp_list_to_str(self.operator, self.lhs, self.rhs)
 
@@ -266,6 +302,12 @@ class ComparisonQuery(Query):
         return ComparisonQuery(self.comparison, self.lhs.bind(sigma),
                 self.rhs.bind(sigma))
 
+    def is_empty(self):
+        return False
+
+    def simplify(self):
+        return self
+
     def __str__(self):
         return lisp_list_to_str(self.comparison, self.lhs, self.rhs)
 
@@ -280,6 +322,12 @@ class AndQuery(Query):
 
     def bind(self, sigma):
         return AndQuery(*(a.bind(sigma) for a in self.queries))
+
+    def is_empty(self):
+        return all(q.is_empty() for q in self.queries)
+
+    def simplify(self):
+        return simplify_and_or(self, "queries", EmptyQuery)
 
     def __str__(self):
         return lisp_list_to_str("and", *self.queries)
@@ -296,6 +344,12 @@ class OrQuery(Query):
     def bind(self, sigma):
         return OrQuery(*(a.bind(sigma) for a in self.queries))
 
+    def is_empty(self):
+        return all(q.is_empty() for q in self.queries)
+
+    def simplify(self):
+        return simplify_and_or(self, "queries", EmptyQuery)
+
     def __str__(self):
         return lisp_list_to_str("or", *self.queries)
 
@@ -310,6 +364,13 @@ class NotQuery(Query):
 
     def bind(self, sigma):
         return NotQuery(self.negated.bind(sigma))
+
+    def is_empty(self):
+        return self.negated.is_empty()
+
+    def simplify(self):
+        self.negated = self.negated.simplify()
+        if self.negated.is_empty(): return EmptyQuery()
 
     def __str__(self):
         return lisp_list_to_str("not", self.negated)
@@ -327,6 +388,16 @@ class ImplyQuery(Query):
     def bind(self, sigma):
         return ImplyQuery(self.lhs.bind(sigma), self.rhs.bind(sigma))
 
+    def is_empty(self):
+        return self.rhs.is_empty()
+
+    def simplify(self):
+        self.lhs = self.lhs.simplify()
+        self.rhs = self.rhs.simplify()
+        if self.rhs.is_empty(): return EmptyQuery()
+        if self.lhs.is_empty(): return self.rhs
+        return self
+
     def __str__(self):
         return lisp_list_to_str("imply", self.lhs, self.rhs)
 
@@ -343,6 +414,14 @@ class ForallQuery(Query):
     def bind(self, sigma):
         return ForallQuery(self.parameters.bind(sigma), self.query.bind(sigma))
 
+    def is_emtpy(self):
+        return self.query.is_empty()
+
+    def simplify(self):
+        self.query = self.query.simplify()
+        if self.query.is_empty(): return EmptyQuery()
+        return self
+
     def __str__(self):
         return "(forall ({}) {})".format(self.parameters, self.query)
 
@@ -358,6 +437,14 @@ class ExistsQuery(Query):
 
     def bind(self, sigma):
         return ExistsQuery(self.parameters.bind(sigma), self.query.bind(sigma))
+
+    def is_emtpy(self):
+        return self.query.is_empty()
+
+    def simplify(self):
+        self.query = self.query.simplify()
+        if self.query.is_empty(): return EmptyQuery()
+        return self
 
     def __str__(self):
         return "(exists ({}) {})".format(self.parameters, self.query)
@@ -378,10 +465,16 @@ class Effect:
     def copy(self):
         return deepcopy(self)
 
+    def is_empty(self):
+        raise NotImplementedError()
+
     def modified_predicates(self):
         raise NotImplementedError()
 
     def modified_functions(self):
+        raise NotImplementedError()
+
+    def simplify(self):
         raise NotImplementedError()
 
 
@@ -393,11 +486,17 @@ class EmptyEffect(Effect):
     def bind(self, sigma):
         return self
 
+    def is_empty(self):
+        return True
+
     def modified_predicates(self):
         return set()
 
     def modified_functions(self):
         return set()
+
+    def simplify(self):
+        return self
 
     def __str__(self):
         return "(and)"
@@ -414,11 +513,17 @@ class AddEffect(Effect):
     def bind(self, sigma):
         return AddEffect(self.add.bind(sigma))
 
+    def is_empty(self):
+        return False
+
     def modified_predicates(self):
         return set([self.add.name])
 
     def modified_functions(self):
         return set()
+
+    def simplify(self):
+        return self
 
     def __str__(self):
         return str(self.add)
@@ -435,11 +540,17 @@ class DeleteEffect(Effect):
     def bind(self, sigma):
         return DeleteEffect(self.delete.bind(sigma))
 
+    def is_empty(self):
+        return False
+
     def modified_predicates(self):
         return set([self.delete.name])
 
     def modified_functions(self):
         return set()
+
+    def simplify(self):
+        return self
 
     def __str__(self):
         return lisp_list_to_str("not", self.delete)
@@ -448,8 +559,7 @@ class DeleteEffect(Effect):
 class AndEffect(Effect):
 
     def __init__(self, *effects):
-        # self.effects = list(effects)
-        self.effects = [e for e in effects if not isinstance(e, EmptyEffect)]
+        self.effects = list(effects)
 
     def apply(self, state, out=None):
         if out is None: out = state.copy()
@@ -459,6 +569,9 @@ class AndEffect(Effect):
 
     def bind(self, sigma):
         return AndEffect(*(a.bind(sigma) for a in self.effects))
+
+    def is_empty(self):
+        return all(e.is_empty() for e in self.effects)
 
     def modified_predicates(self):
         mp = set()
@@ -471,6 +584,9 @@ class AndEffect(Effect):
         for e in self.effects:
             mf.update(e.modified_functions())
         return mf
+
+    def simplify(self):
+        return simplify_and_or(self, "effects", EmptyEffect)
 
     def __len__(self):
         return len(self.effects)
@@ -491,11 +607,19 @@ class ForallEffect(Effect):
     def bind(self, sigma):
         return TotalEffect(self.parameters.bind(sigma), self.effect.bind(sigma))
 
+    def is_empty(self):
+        return self.effect.is_empty()
+
     def modified_predicates(self):
         return self.effect.modified_predicates()
 
     def modified_functions(self):
         return self.effect.modified_functions()
+
+    def simplify(self):
+        self.effect = self.effect.simplify()
+        if self.effect.is_empty(): return EmptyEffect()
+        return self
 
     def __str__(self):
         return "(forall ({}) {})".format(self.parameters, self.effect)
@@ -517,11 +641,21 @@ class ConditionalEffect(Effect):
     def bind(self, sigma):
         return ConditionalEffect(self.lhs.bind(sigma), self.rhs.bind(sigma))
 
+    def is_empty(self):
+        return self.rhs.is_empty()
+
     def modified_predicates(self):
         return self.rhs.modified_predicates()
 
     def modified_functions(self):
         return self.rhs.modified_functions()
+
+    def simplify(self):
+        self.lhs = self.lhs.simplify()
+        self.rhs = self.rhs.simplify()
+        if self.rhs.is_empty(): return EmptyEffect()
+        if self.lhs.is_empty(): return self.rhs
+        return self
 
     def __str__(self):
         return lisp_list_to_str("when", self.lhs, self.rhs)
@@ -544,11 +678,17 @@ class AssignmentEffect(Effect):
         return AssignmentEffect(self.assignop, self.lhs.bind(sigma),
                 self.rhs.bind(sigma))
 
+    def is_empty(self):
+        return False
+
     def modified_predicates(self):
         return set()
 
     def modified_functions(self):
         return set([self.lhs.name])
+
+    def simplify(self):
+        return self
 
     def __str__(self):
         return lisp_list_to_str(self.assignop, self.lhs, self.rhs)
@@ -562,9 +702,6 @@ class ProbabilisticEffect(Effect):
             total_prob += p
         assert total_prob < (1+1e-6)
         self.effects = list(effects)
-        # self.effects = [e for e in effects
-                # if not isinstance(e,EmptyEffect) and not
-                # (isinstance(e,AndEffect) and len(e.effects) == 0)]
 
     def apply(self, state, out=None):
         if out is None: out = state.copy()
@@ -580,6 +717,9 @@ class ProbabilisticEffect(Effect):
     def bind(self, sigma):
         return ProbabilisticEffect(*((p,e.bind(sigma)) for p, e in self.effects))
 
+    def is_empty(self):
+        return all(e.is_empty() for _,e in self.effects)
+
     def modified_predicates(self):
         mp = set()
         for p, e in self.effects:
@@ -591,6 +731,16 @@ class ProbabilisticEffect(Effect):
         for p, e in self.effects:
             mf.update(e.modified_predicates())
         return mf
+
+    def simplify(self):
+        self.effects = [(p,e) for p,e in
+                map(lambda t: (t[0],t[1].simplify()), self.effects)
+                if not e.is_empty() and p > 1e-6]
+        if len(self.effects) == 1 and abs(self.effects[0][0] - 1) < 1e-6:
+            return self.effects[0][1]
+        if not self.effects:
+            return EmptyEffect()
+        return self
 
     def sum_to_one(self):
         accprob = 0
@@ -643,8 +793,12 @@ class Action:
         return self.effect.modified_functions()
 
     def __str__(self):
-        return "(:action {}\n  :parameters ({})\n  :precondition {}\n  :effect {}\n)".format(
-                self.name, self.parameters, self.precondition, self.effect)
+        ret = "(:action {}\n".format(self.name)
+        if self.parameters: ret += "  :parameters ({})\n".format(self.parameters)
+        if not self.precondition.is_empty(): ret += "  :precondition {}\n".format(self.precondition)
+        if not self.effect.is_empty(): ret += "  :effect {}\n".format(self.effect)
+        ret += ")"
+        return ret
 
 
 class Domain:
@@ -827,6 +981,15 @@ def to_type_hierarchy(types):
 
 def lisp_list_to_str(*args):
     return "({})".format(" ".join(str(a) for a in args))
+
+
+def simplify_and_or(obj, attr, empty_class):
+    l = getattr(obj, attr)
+    l = [e for e in map(lambda e: e.simplify(), l) if not e.is_empty()]
+    setattr(obj, attr, l)
+    if len(l) == 1: return l[0]
+    if not l: return empty_class()
+    return obj
 
 
 def type_hierarchy_to_str(hierarchy):

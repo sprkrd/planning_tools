@@ -240,9 +240,9 @@ def process_action(tree, domain):
     # tree[2] is the :parameters keyword
     action.parameters = process_objects(tree[3])
     # tree[4] is the :precondition keyword
-    action.precondition = process_query(tree[5], domain)
+    action.precondition = process_query(tree[5], domain).simplify()
     # tree[6] is the :effect keyword
-    action.effect = process_effect(tree[7], domain)
+    action.effect = process_effect(tree[7], domain).simplify()
     return action
 
 
