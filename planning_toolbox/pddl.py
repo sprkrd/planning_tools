@@ -737,8 +737,8 @@ class ProbabilisticEffect(Effect):
         self.effects = [(p,e) for p,e in
                 map(lambda t: (t[0],t[1].simplify()), self.effects)
                 if not e.is_empty() and p > 1e-6]
-        if len(self.effects) == 1 and abs(self.effects[0][0] - 1) < 1e-6:
-            return self.effects[0][1]
+        # if len(self.effects) == 1 and abs(self.effects[0][0] - 1) < 1e-6:
+            # return self.effects[0][1]
         if not self.effects:
             return EmptyEffect()
         return self

@@ -14,7 +14,7 @@ def main(domainpath): #, problempath):
         # problem = process_problem(tree, domain)
     # determinized = all_outcome_determinization(domain)
     # determinized = single_outcome_determinization(domain, "mlo")
-    determinized = alpha_cost_likelihood_determinization(domain, 0.05, 1.0)
+    determinized = alpha_cost_likelihood_determinization(domain, 1.0, round_=2)
     print(determinized)
     # print(domain)
     # print(domain.actions[0])
