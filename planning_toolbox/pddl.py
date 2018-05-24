@@ -371,6 +371,7 @@ class NotQuery(Query):
     def simplify(self):
         self.negated = self.negated.simplify()
         if self.negated.is_empty(): return EmptyQuery()
+        return self
 
     def __str__(self):
         return lisp_list_to_str("not", self.negated)

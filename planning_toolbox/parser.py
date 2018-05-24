@@ -237,12 +237,13 @@ def process_effect(tree, domain):
 
 def process_action(tree, domain):
     action = pddl.Action(tree[1].node)
-    # tree[2] is the :parameters keyword
-    action.parameters = process_objects(tree[3])
-    # tree[4] is the :precondition keyword
-    action.precondition = process_query(tree[5], domain).simplify()
-    # tree[6] is the :effect keyword
-    action.effect = process_effect(tree[7], domain).simplify()
+    for kw, subtree in zip(tree[2::2], tree[3::2]):
+        if kw.node == ":parameters":
+            action.parameters = process_objects(subtree)
+        elif kw.node == ":precondition":
+            action.precondition = process_query(subtree, domain).simplify()
+        elif kw.node == ":effect":
+            action.effect = process_effect(subtree, domain).simplify()
     return action
 
 
