@@ -7,18 +7,44 @@ from itertools import product
 from math import log
 
 
+# class Determinizer:
+
+    # def __init__(self, domain):
+        # self.original_domain = domain
+        # self.preprocessed_domain = preprocess_domain(domain.copy())
+        # self.determinized_domain = self.determinize_domain(self.preprocessed.copy())
+
+    # def determinize_domain(self, domain):
+        # raise NotImplementedError()
+
+    # def determinize_problem(self, problem):
+        # raise NotImplementedError()
+
+    # def __call__(self, problem):
+        # return self.determinize_problem(problem)
+
+
+# class AllOutcomeDeterminizer(Determinizer):
+
+    # def determinize_domain(self, domain):
+        # domain = remove_mdp_features(domain)
+        # actions = []
+
+
 def all_outcome_determinization(domain):
-    determinized = remove_mdp_features(preprocess_domain(domain.copy()))
+    domain.remove_mdp_requirements()
+    domain.expand_probabilistic_effects()
+    domain.remove_reward_assignments()
     actions = []
-    for a in determinized.actions:
+    for a in domain.actions:
         assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
         for idx, (_, e) in enumerate(a.effect):
             anew = a.copy()
             anew.name = anew.name + "_o" + str(idx)
             anew.effect = e
             actions.append(anew)
-    determinized.actions = actions
-    return determinized
+    domain.actions = actions
+    return domain
 
 
 def single_outcome_determinization(domain, strategy="mlo"):
@@ -27,25 +53,27 @@ def single_outcome_determinization(domain, strategy="mlo"):
     mae: most additive effects
     """
     assert strategy in ("mlo", "mae")
-    determinized = remove_mdp_features(preprocess_domain(domain.copy()))
+    domain.remove_mdp_requirements()
+    domain.expand_probabilistic_effects()
+    domain.remove_reward_assignments()
     actions = []
-    for a in determinized.actions:
+    for a in domain.actions:
         assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
         selected_outcome = None
         for idx, (p, e) in enumerate(a.effect):
-            score = p if strategy == "mlo" else count_additive_effects(e)
+            score = p if strategy == "mlo" else e.count_additive_effects()
             if selected_outcome is None or score > selected_outcome[1]:
                 selected_outcome = (idx, score, e)
         anew = a.copy()
         anew.name = anew.name + "_o" + str(selected_outcome[0])
         anew.effect = selected_outcome[2]
         actions.append(anew)
-    determinized.actions = actions
-    return determinized
+    domain.actions = actions
+    return domain
 
 
 def alpha_cost_likelihood_determinization(domain, alpha=1.0, inters=0, round_=0):
-    determinized = remove_mdp_features(preprocess_domain(domain.copy()))
+    determinized = remove_mdp_features(preprocess_domain(domain))
     actions = []
     for a in determinized.actions:
         assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
@@ -139,22 +167,17 @@ def substitute_reward_by_total_cost(effect):
     return effect
 
 
-def remove_mdp_features(domain):
-    rewards = domain.allows_reward_fluent()
-    for req in (":probabilistic-effects", ":rewards", ":mdp"):
-        try:
-            domain.requirements.remove(req)
-        except ValueError:
-            pass
-    if rewards:
-        if ":fluents" not in domain.requirements:
-            domain.requirements.append(":fluents")
-        if not any(f.name == "total-cost" for f in domain.functions):
-            domain.functions.append(Function("total-cost"))
-        for a in domain.actions:
-            a.effect = substitute_reward_by_total_cost(a.effect)
-            a.effect = a.effect.simplify()
-    return domain
+def remove_reward_assignments(effect):
+    if isinstance(effect, AssignmentEffect):
+        if effect.lhs.name == "reward": effect = EmptyEffect()
+    elif isinstance(effect, ForallEffect):
+        effect.effect = remove_reward_assignments(effect.effect)
+    elif isinstance(effect, ConditionalEffect):
+        effect.rhs = remove_reward_assignments(effect.rhs)
+    elif isinstance(effect, ProbabilisticEffect):
+        effect.effects = [(p, remove_reward_assignments(e))
+                for p,e in effect.effects]
+    return effect
 
 
 def multiply_costs(effect, m=1.0, round_=0):

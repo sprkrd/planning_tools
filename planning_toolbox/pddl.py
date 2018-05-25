@@ -3,8 +3,9 @@
 #################
 
 from copy   import deepcopy
+from functools import reduce
+from itertools import product
 from random import random
-
 
 class Object:
 
@@ -466,6 +467,12 @@ class Effect:
     def copy(self):
         return deepcopy(self)
 
+    def count_additive_effects(self):
+        raise NotImplementedError()
+
+    def expand_probabilistic_effects(self):
+        raise NotImplementedError()
+
     def is_empty(self):
         raise NotImplementedError()
 
@@ -473,6 +480,17 @@ class Effect:
         raise NotImplementedError()
 
     def modified_functions(self):
+        raise NotImplementedError()
+
+    def add_cost_offset(self, offset):
+        assigeff = AssignmentEffect("increase", Function("total-cost"),
+                Constant(offset))
+        return AndEffect(self, assigeff)
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        raise NotImplementedError()
+
+    def remove_reward_assignments(self):
         raise NotImplementedError()
 
     def simplify(self):
@@ -487,6 +505,12 @@ class EmptyEffect(Effect):
     def bind(self, sigma):
         return self
 
+    def count_additive_effects(self):
+        return 0
+
+    def expand_probabilistic_effects(self):
+        return ProbabilisticEffect((1.0, self))
+
     def is_empty(self):
         return True
 
@@ -495,6 +519,12 @@ class EmptyEffect(Effect):
 
     def modified_functions(self):
         return set()
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        return self
+
+    def remove_reward_assignments(self):
+        return self
 
     def simplify(self):
         return self
@@ -514,6 +544,12 @@ class AddEffect(Effect):
     def bind(self, sigma):
         return AddEffect(self.add.bind(sigma))
 
+    def count_additive_effects(self):
+        return 1
+
+    def expand_probabilistic_effects(self):
+        return ProbabilisticEffect((1.0, self))
+
     def is_empty(self):
         return False
 
@@ -522,6 +558,12 @@ class AddEffect(Effect):
 
     def modified_functions(self):
         return set()
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        return self
+
+    def remove_reward_assignments(self):
+        return self
 
     def simplify(self):
         return self
@@ -541,6 +583,12 @@ class DeleteEffect(Effect):
     def bind(self, sigma):
         return DeleteEffect(self.delete.bind(sigma))
 
+    def count_additive_effects(self):
+        return 0
+
+    def expand_probabilistic_effects(self):
+        return ProbabilisticEffect((1.0, self))
+
     def is_empty(self):
         return False
 
@@ -549,6 +597,12 @@ class DeleteEffect(Effect):
 
     def modified_functions(self):
         return set()
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        return self
+
+    def remove_reward_assignments(self):
+        return self
 
     def simplify(self):
         return self
@@ -571,6 +625,17 @@ class AndEffect(Effect):
     def bind(self, sigma):
         return AndEffect(*(a.bind(sigma) for a in self.effects))
 
+    def count_additive_effects(self):
+        return sum(e.count_additive_effects() for e in self.effects)
+
+    def expand_probabilistic_effects(self):
+        expanded_effects = [e.expand_probabilistic_effects() for e in self.effects]
+        return ProbabilisticEffect(*[
+            (reduce(lambda acc, t: acc*t[0], outcome, 1.0),
+            AndEffect(*(e for p,e in outcome)))
+            for outcome in product(*(e.effects for e in expanded_effects))
+        ])
+
     def is_empty(self):
         return all(e.is_empty() for e in self.effects)
 
@@ -585,6 +650,29 @@ class AndEffect(Effect):
         for e in self.effects:
             mf.update(e.modified_functions())
         return mf
+
+    def add_cost_offset(self, offset):
+        found = False
+        for e in self.effects:
+            if isinstance(e, AssignmentEffect) and e.lhs.name == "total-cost" \
+                    and e.assignop == "increase" and isinstance(e.rhs, Constant):
+                e.rhs.constant += offset
+                found = True
+                break
+        if not found:
+            assigneff = AssignmentEffect("increase", Function("total-cost"),
+                    offset)
+            self.effects.append(assigneff)
+        return self
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        self.effects = [e.transform_rewards_to_costs(alpha,inters,round_)
+                for e in self.effects]
+        return self
+
+    def remove_reward_assignments(self):
+        self.effects = [e.remove_reward_assignments() for e in self.effects]
+        return self
 
     def simplify(self):
         return simplify_and_or(self, "effects", EmptyEffect)
@@ -608,6 +696,16 @@ class ForallEffect(Effect):
     def bind(self, sigma):
         return TotalEffect(self.parameters.bind(sigma), self.effect.bind(sigma))
 
+    def count_additive_effects(self):
+        return self.effect.count_additive_effects()
+
+    def expand_probabilistic_effects(self):
+        """
+        We assume that there are not nested probabilistic effects inside a
+        total effect
+        """
+        return ProbabilisticEffect((1.0, self))
+
     def is_empty(self):
         return self.effect.is_empty()
 
@@ -616,6 +714,13 @@ class ForallEffect(Effect):
 
     def modified_functions(self):
         return self.effect.modified_functions()
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        self.effect = self.effect.transform_rewards_to_costs(alpha, inters, round_)
+
+    def remove_reward_assignments(self):
+        self.effect = self.effect.remove_reward_assignments()
+        return self
 
     def simplify(self):
         self.effect = self.effect.simplify()
@@ -642,6 +747,14 @@ class ConditionalEffect(Effect):
     def bind(self, sigma):
         return ConditionalEffect(self.lhs.bind(sigma), self.rhs.bind(sigma))
 
+    def count_additive_effects(self):
+        return self.rhs.count_additive_effects()
+
+    def expand_probabilistic_effects(self):
+        expanded = self.rhs.expand_probabilistic_effects()
+        return ProbabilisticEffect(*((p, ConditionalEffect(self.lhs, e))
+                for p,e in expanded))
+
     def is_empty(self):
         return self.rhs.is_empty()
 
@@ -650,6 +763,14 @@ class ConditionalEffect(Effect):
 
     def modified_functions(self):
         return self.rhs.modified_functions()
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        self.rhs = self.rhs.transform_rewards_to_costs(alpha, inters, round_)
+        return self
+
+    def remove_reward_assignments(self):
+        self.rhs = self.rhs.remove_reward_assignments()
+        return self
 
     def simplify(self):
         self.lhs = self.lhs.simplify()
@@ -675,6 +796,12 @@ class AssignmentEffect(Effect):
     def apply(self, state, out=None):
         raise NotImplementedError()
 
+    def count_additive_effects(self):
+        return 0
+
+    def expand_probabilistic_effects(self):
+        return ProbabilisticEffect((1.0, self))
+
     def bind(self, sigma):
         return AssignmentEffect(self.assignop, self.lhs.bind(sigma),
                 self.rhs.bind(sigma))
@@ -687,6 +814,21 @@ class AssignmentEffect(Effect):
 
     def modified_functions(self):
         return set([self.lhs.name])
+
+    def remove_reward_assignments(self):
+        if self.lhs.name == "reward": return EmptyEffect()
+        return self
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        if self.lhs.name == "reward":
+            if self.assignop == "decrease":
+                self.lhs.name = "total-cost"
+                self.assignop = "increase"
+                if isinstance(self.rhs, Constant):
+                    self.rhs = self.rhs*alpha + inters
+                    if round_ > 0: self.rhs = round(self.rhs*10**round_)
+            else: return EmptyEffect()
+        return self
 
     def simplify(self):
         return self
@@ -715,6 +857,20 @@ class ProbabilisticEffect(Effect):
                 break
         return out
 
+    def count_additive_effects(self):
+        return max(e.count_additive_effects() for _,e in self.effects)
+
+    def expand_probabilistic_effects(self):
+        outcomes = []
+        remaining = 1.0
+        for p,e in self.effects:
+            remaining -= p
+            outcomes += [(p*p_, e_)
+                    for p_,e_ in e.expand_probabilistic_effects().effects]
+        if remaining > 1e-6:
+            outcomes.append((remaining, EmptyEffect()))
+        return ProbabilisticEffect(*outcomes)
+        
     def bind(self, sigma):
         return ProbabilisticEffect(*((p,e.bind(sigma)) for p, e in self.effects))
 
@@ -732,6 +888,15 @@ class ProbabilisticEffect(Effect):
         for p, e in self.effects:
             mf.update(e.modified_predicates())
         return mf
+
+    def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
+        self.effects = [(p, e.transform_rewards_to_costs(alpha, inters, round_))
+                for p,e in self.effects]
+        return self
+
+    def remove_reward_assignments(self):
+        self.effects = [(p,e.remove_reward_assignments()) for p,e in self.effects]
+        return self
 
     def simplify(self):
         self.effects = [(p,e) for p,e in
@@ -860,6 +1025,21 @@ class Domain:
     def copy(self):
         return deepcopy(self)
 
+    def expand_probabilistic_effects(self):
+        for a in self.actions:
+            a.effect = a.effect.expand_probabilistic_effects().simplify()
+
+    def remove_reward_assignments(self):
+        for a in self.actions:
+            a.effect = a.effect.remove_reward_assignments().simplify()
+
+    def remove_mdp_requirements(self):
+        for req in (":probabilistic-effects", ":rewards", ":mdp"):
+            try:
+                self.requirements.remove(req)
+            except ValueError:
+                pass
+        
     def __str__(self):
         ret = "(define (domain " + self.name + ")\n\n"
         if self.requirements:

@@ -6,13 +6,15 @@ def main(domainpath, problempath):
     with open(domainpath, "r") as f:
         text = f.read()
         tree = parse(text)
-        domain = process_domain(tree)
-    with open(problempath, "r") as f:
-        text = f.read()
-        tree = parse(text)
-        problem = process_problem(tree, domain)
-    print(domain)
-    print(problem)
+        print(tree[0])
+        print(tree[1])
+        # domain = process_domain(tree)
+    # with open(problempath, "r") as f:
+        # text = f.read()
+        # tree = parse(text)
+        # problem = process_problem(tree, domain)
+    # print(domain)
+    # print(problem)
 
 
 if __name__ == "__main__":

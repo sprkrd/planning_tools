@@ -11,11 +11,14 @@ def main(domainpath): #, problempath):
     # with open(problempath, "r") as f:
         # text = f.read()
         # tree = parse(text)
-        # problem = process_problem(tree, domain)
-    # determinized = all_outcome_determinization(domain)
-    # determinized = single_outcome_determinization(domain, "mlo")
-    determinized = alpha_cost_likelihood_determinization(domain, 1.0, round_=2)
+        # problem = process_problem(tree, domain.copy())
+    # determinized = all_outcome_determinization(domain.copy())
+    determinized = single_outcome_determinization(domain.copy(), "mlo")
+    # determinized = alpha_cost_likelihood_determinization(domain.copy(),
+            # 1.0, round_=2)
     print(determinized)
+    print(domain)
+    # domain.expand_probabilistic_effects()
     # print(domain)
     # print(domain.actions[0])
     # expanded = expand_probabilistic_actions(domain.actions)
