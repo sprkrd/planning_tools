@@ -825,7 +825,7 @@ class AssignmentEffect(Effect):
                 self.lhs.name = "total-cost"
                 self.assignop = "increase"
                 if isinstance(self.rhs, Constant):
-                    self.rhs = self.rhs*alpha + inters
+                    self.rhs.constant = self.rhs.constant*alpha + inters
                     if round_ > 0: self.rhs = round(self.rhs*10**round_)
             else: return EmptyEffect()
         return self
@@ -1028,10 +1028,12 @@ class Domain:
     def expand_probabilistic_effects(self):
         for a in self.actions:
             a.effect = a.effect.expand_probabilistic_effects().simplify()
+        return self
 
     def remove_reward_assignments(self):
         for a in self.actions:
             a.effect = a.effect.remove_reward_assignments().simplify()
+        return self
 
     def remove_mdp_requirements(self):
         for req in (":probabilistic-effects", ":rewards", ":mdp"):
@@ -1039,6 +1041,7 @@ class Domain:
                 self.requirements.remove(req)
             except ValueError:
                 pass
+        return self
         
     def __str__(self):
         ret = "(define (domain " + self.name + ")\n\n"
