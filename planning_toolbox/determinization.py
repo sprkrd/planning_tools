@@ -73,68 +73,28 @@ class SingleOutcomeDeterminizer(Determinizer):
 
 
 class AlphaCostLikelihoodDeterminizer(Determinizer):
-    pass
 
+    def __init__(self, alpha=1, base=0, round_=0):
+        self.alpha = alpha
+        self.base = base
+        self.round_ = round_
 
-
-def all_outcome_determinization(domain):
-    domain.remove_mdp_requirements()
-    domain.expand_probabilistic_effects()
-    domain.remove_reward_assignments()
-    actions = []
-    for a in domain.actions:
-        assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
-        for idx, (_, e) in enumerate(a.effect):
-            anew = a.copy()
-            anew.name = anew.name + "_o" + str(idx)
-            anew.effect = e
-            actions.append(anew)
-    domain.actions = actions
-    return domain
-
-
-def single_outcome_determinization(domain, strategy="mlo"):
-    """
-    mlo: most likely outcome
-    mae: most additive effects
-    """
-    assert strategy in ("mlo", "mae")
-    domain.remove_mdp_requirements()
-    domain.expand_probabilistic_effects()
-    domain.remove_reward_assignments()
-    actions = []
-    for a in domain.actions:
-        assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
-        selected_outcome = None
-        for idx, (p, e) in enumerate(a.effect):
-            score = p if strategy == "mlo" else e.count_additive_effects()
-            if selected_outcome is None or score > selected_outcome[1]:
-                selected_outcome = (idx, score, e)
-        anew = a.copy()
-        anew.name = anew.name + "_o" + str(selected_outcome[0])
-        anew.effect = selected_outcome[2]
-        actions.append(anew)
-    domain.actions = actions
-    return domain
-
-
-def alpha_cost_likelihood_determinization(domain, alpha=1.0, base=0, round_=0):
-    domain.remove_mdp_requirements()
-    domain.expand_probabilistic_effects()
-    actions = []
-    for a in domain.actions:
-        assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
-        for idx, (p, e) in enumerate(a.effect):
-            anew = a.copy()
-            anew.name = anew.name + "_o" + str(idx)
-            anew.effect = e.copy().transform_rewards_to_costs(alpha, round_=round_)
-            offset = base - log(p)
-            if round_ > 0: offset = round(offset*10**round_)
-            if offset > 1e-6: anew.effect = anew.effect.add_cost_offset(offset)
-            actions.append(anew)
-    domain.actions = actions
-    return domain
-
+    def determinize_domain(self, domain):
+        domain.remove_mdp_requirements()
+        actions = []
+        for a in domain.actions:
+            assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
+            for idx, (p, e) in enumerate(a.effect):
+                anew = a.copy()
+                anew.name = anew.name + "_o" + str(idx)
+                anew.effect = e.copy().transform_rewards_to_costs(
+                        self.alpha, round_=self.round_)
+                offset = self.base - log(p)
+                if self.round_ > 0: offset = round(offset*10**self.round_)
+                if offset > 1e-6: anew.effect = anew.effect.add_cost_offset(offset)
+                actions.append(anew)
+        domain.actions = actions
+        return domain
 
 #############
 # UTILITIES #
