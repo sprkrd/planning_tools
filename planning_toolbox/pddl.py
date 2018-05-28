@@ -1118,7 +1118,14 @@ class Problem:
         self.goal = Goal(EmptyQuery()) if goal is None else goal
 
     def copy(self):
-        return deepcopy(self)
+        return Problem(name, self.domain, objects.copy(), init.copy(), goal.copy())
+
+    def remove_mdp_requirements(self):
+        self.goal.reward = None
+        metricfun = self.goal.metric[1]
+        if isinstance(metricfun, Function) and metricfun.name == "reward":
+            self.goal.metric = None
+        return self
 
     def __str__(self):
         ret = "(define (problem {})\n".format(self.name)

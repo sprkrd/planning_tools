@@ -40,6 +40,9 @@ class AllOutcomeDeterminizer(Determinizer):
                 actions.append(anew)
         domain.actions = actions
         return domain
+
+    def determinize_problem(self, problem):
+        pass
         
 
 class SingleOutcomeDeterminizer(Determinizer):
@@ -71,6 +74,9 @@ class SingleOutcomeDeterminizer(Determinizer):
         domain.actions = actions
         return domain
 
+    def determinize_problem(self, problem):
+        pass
+
 
 class AlphaCostLikelihoodDeterminizer(Determinizer):
 
@@ -95,6 +101,10 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
                 actions.append(anew)
         domain.actions = actions
         return domain
+
+    def determinize_problem(self, problem):
+        pass
+
 
 #############
 # UTILITIES #
