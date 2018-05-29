@@ -21,7 +21,7 @@ class Determinizer:
         raise NotImplementedError()
 
     def __call__(self, problem):
-        return self.determinize_problem(problem)
+        return self.determinize_problem(problem.copy())
 
 
 class AllOutcomeDeterminizer(Determinizer):
@@ -42,7 +42,8 @@ class AllOutcomeDeterminizer(Determinizer):
         return domain
 
     def determinize_problem(self, problem):
-        pass
+        problem.remove_mdp_features()
+        return problem
         
 
 class SingleOutcomeDeterminizer(Determinizer):
@@ -75,7 +76,8 @@ class SingleOutcomeDeterminizer(Determinizer):
         return domain
 
     def determinize_problem(self, problem):
-        pass
+        problem.remove_mdp_features()
+        return problem
 
 
 class AlphaCostLikelihoodDeterminizer(Determinizer):
@@ -98,12 +100,20 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
                 offset = self.base - log(p)
                 if self.round_ > 0: offset = round(offset*10**self.round_)
                 if offset > 1e-6: anew.effect = anew.effect.add_cost_offset(offset)
-                actions.append(anew)
+                # don't consider actions that only increase the total cost
+                # and don't modify the state in any other way
+                if not (isinstance(anew.effect, AssignmentEffect) and
+                        anew.effect.lhs.name == "total-cost"):
+                    actions.append(anew)
         domain.actions = actions
         return domain
 
     def determinize_problem(self, problem):
-        pass
+        problem.remove_mdp_features()
+        tcfun = Function("total-cost")
+        problem.init.functions[tcfun] = 0
+        problem.goal.metric = ("minimize", tcfun)
+        return problem
 
 
 #############

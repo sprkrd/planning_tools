@@ -91,14 +91,6 @@ def read_from_tokens(tokens):
     return atom(token)
 
 
-def parse(text):
-    text_wo_comments = remove_comments(text)
-    tokens = tokenize(text_wo_comments)
-    tokens.reverse()
-    syntax_tree = read_from_tokens(tokens)
-    return syntax_tree
-
-
 def process_types(tree):
     hierarchy = {}
     acc = []
@@ -130,8 +122,12 @@ def process_objects(tree):
 
 
 def process_functional(tree, predicate=True):
-    name = tree[0].node
-    objlist = process_objects(tree[1:])
+    if tree.is_symbol() and not predicate:
+        name = tree.node
+        objlist = pddl.ObjectList()
+    else:
+        name = tree[0].node
+        objlist = process_objects(tree[1:])
     class_ = pddl.Predicate if predicate else pddl.Function
     return class_(name, objlist)
 
@@ -154,15 +150,14 @@ def process_functions(tree):
 
 def process_query(tree, domain):
     def is_predicate_symbol(tree):
-        if tree[0].node == "=":
-            ret = ":equality" in domain.requirements or ":adl" in domain.requirements
-            ret = ret and tree[1].is_symbol() and tree[2].is_symbol()
+        if tree[0].node == "=" and domain.allows_equality_predicate():
+            ret = tree[1].is_symbol() and tree[2].is_symbol()
             ret = ret and tree[1].node not in (f.name for f in domain.functions)
             ret = ret and tree[2].node not in (f.name for f in domain.functions)
             return ret
         return tree[0].node in (p.name for p in domain.predicates)
     def is_function_symbol(tree):
-        if tree[0].node == "reward" and ":rewards" in domain.requirements:
+        if tree[0].node == "reward" and domain.allows_reward_fluent():
             return True
         return tree[0].node in (f.name for f in domain.functions)
     query = None
@@ -299,15 +294,25 @@ def process_problem(tree, domain):
     return problem
 
 
-def print_syntax_tree(tree, prefix="", last=False):
-    if isinstance(tree, list):
-        print(prefix + "[]")
-        if prefix:
-            nst_prefix = prefix[:-2]+(" " if last else "|") + " |_"
-        else:
-            nst_prefix = "|_"
-        for idx, nst in enumerate(tree):
-            print_syntax_tree(nst, nst_prefix, idx==len(tree)-1)
-    else:
-        print(prefix + str(tree))
+def parse(text, type_="domain"):
+    assert type_ in ("raw", "domain", "problem", "both")
+    text_wo_comments = remove_comments(text)
+    tokens = tokenize(text_wo_comments)
+    tokens.reverse()
+    if type_ == "raw":
+        return read_from_tokens(tokens)
+    elif type_ == "domain":
+        return process_domain(read_from_tokens(tokens))
+    elif type_ == "problem":
+        return process_problem(read_from_tokens(tokens))
+    else: # type_ == both
+        domain = process_domain(read_from_tokens(tokens))
+        problem = process_problem(read_from_tokens(tokens), domain)
+        return domain, problem
+
+
+def parse_file(filename, type_="domain"):
+    with open(filename,"r") as f:
+        text = f.read()
+    return parse(text, type_)
 

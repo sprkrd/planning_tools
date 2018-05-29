@@ -337,7 +337,7 @@ class AndQuery(Query):
 class OrQuery(Query):
 
     def __init__(self, *queries):
-        self.args = list(queries)
+        self.queries = list(queries)
 
     def eval(self, state):
         return any(a.eval(state) for a in self.queries)
@@ -349,7 +349,7 @@ class OrQuery(Query):
         return all(q.is_empty() for q in self.queries)
 
     def simplify(self):
-        return simplify_and_or(self, "queries", EmptyQuery)
+        return simplify_and_or(self, "queries", OrQuery)
 
     def __str__(self):
         return lisp_list_to_str("or", *self.queries)
@@ -416,7 +416,7 @@ class ForallQuery(Query):
     def bind(self, sigma):
         return ForallQuery(self.parameters.bind(sigma), self.query.bind(sigma))
 
-    def is_emtpy(self):
+    def is_empty(self):
         return self.query.is_empty()
 
     def simplify(self):
@@ -637,6 +637,7 @@ class AndEffect(Effect):
         ])
 
     def is_empty(self):
+        if None in self.effects: print(self)
         return all(e.is_empty() for e in self.effects)
 
     def modified_predicates(self):
@@ -675,6 +676,13 @@ class AndEffect(Effect):
         return self
 
     def simplify(self):
+        effects = []
+        for e in self.effects:
+            if isinstance(e, AndEffect):
+                effects += e.effects
+            else:
+                effects.append(e)
+        self.effects = effects
         return simplify_and_or(self, "effects", EmptyEffect)
 
     def __len__(self):
@@ -717,6 +725,7 @@ class ForallEffect(Effect):
 
     def transform_rewards_to_costs(self, alpha=1, inters=0, round_=0):
         self.effect = self.effect.transform_rewards_to_costs(alpha, inters, round_)
+        return self
 
     def remove_reward_assignments(self):
         self.effect = self.effect.remove_reward_assignments()
@@ -814,6 +823,13 @@ class AssignmentEffect(Effect):
 
     def modified_functions(self):
         return set([self.lhs.name])
+
+    def add_cost_offset(self, offset):
+        if self.assignop == "increase" and self.lhs.name == "total-cost" and\
+                isinstance(self.rhs, Constant):
+            self.rhs.constant += offset
+            return self
+        return super().add_cost_offset(offset)
 
     def remove_reward_assignments(self):
         if self.lhs.name == "reward": return EmptyEffect()
@@ -1118,13 +1134,15 @@ class Problem:
         self.goal = Goal(EmptyQuery()) if goal is None else goal
 
     def copy(self):
-        return Problem(name, self.domain, objects.copy(), init.copy(), goal.copy())
+        return Problem(self.name, self.domain, self.objects.copy(),
+                self.init.copy(), self.goal.copy())
 
-    def remove_mdp_requirements(self):
+    def remove_mdp_features(self):
         self.goal.reward = None
-        metricfun = self.goal.metric[1]
-        if isinstance(metricfun, Function) and metricfun.name == "reward":
-            self.goal.metric = None
+        if self.goal.metric:
+            metricfun = self.goal.metric[1]
+            if isinstance(metricfun, FunctionQuery) and metricfun.function.name == "reward":
+                self.goal.metric = None
         return self
 
     def __str__(self):
@@ -1141,7 +1159,25 @@ class Problem:
 class State:
 
     def __init__(self, predicates=None, functions=None, problem=None):
+        self.predicates = set() if predicates is None else predicates
+        self.functions = {} if functions is None else functions
+        self.total_cost = None
+        self.reward = None
+
+    def add_predicate(self, predicate):
         pass
+
+    def delete_predicate(self, predicate):
+        pass
+
+    def set_function_value(self, function, value):
+        if function.name == "total-cost":
+            self.total_cost = value
+        elif function.name == "reward":
+            self.reward = value
+
+    def __hash__(self):
+        return hash(frozenset(self.predicates))
 
 
 ####################
