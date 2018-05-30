@@ -21,7 +21,9 @@ class Determinizer:
         raise NotImplementedError()
 
     def __call__(self, problem):
-        return self.determinize_problem(problem.copy())
+        determinized_problem = self.determinize_problem(problem.copy())
+        determinized_problem.domain = self.determinized_domain
+        return determinized_problem
 
 
 class AllOutcomeDeterminizer(Determinizer):

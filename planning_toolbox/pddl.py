@@ -1175,6 +1175,7 @@ class State:
             self.total_cost = value
         elif function.name == "reward":
             self.reward = value
+        else self.functions[
 
     def __hash__(self):
         return hash(frozenset(self.predicates))

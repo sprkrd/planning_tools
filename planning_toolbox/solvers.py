@@ -1,16 +1,12 @@
 import re
 import subprocess
 
-from .pddl_utility import PddlDomainFile
-from .pddl_utility import PddlProblemFile
-from .pddl_utility import success_probability
+from tempfile import NamedTemporaryFile
 
 
 class CmdPlanner:
 
-    SUPPORTS_TIMEOUT = False
-
-    def __init__(self, parameters={}, round_costs=0):
+    def __init__(self, *args, **kwargs):
         self.parameters = parameters
         self.round_costs = round_costs
 
@@ -20,25 +16,20 @@ class CmdPlanner:
     def _parse_out_(self, out):
         raise NotImplementedError()
 
-    def _supports_timeout_(self):
-        return self.SUPPORTS_TIMEOUT
-
-    def run_planner(self, domain_file, problem_file):
+    def run_planner(self, domain_file, problem_file, timeout=None):
         cmd = self.get_cmd(domain_file, problem_file)
         parameters = self.parameters
         timeout = None if self._supports_timeout_() else parameters.get('timeout', None)
         try:
-            out = subprocess.check_output(cmd, timeout=timeout)
+            out = subprocess.check_output(cmd)
             out = out.decode('ascii')
             result = self._parse_out_(out)
-            if 'timeout' not in result:
-                result['timeout'] = False
+            result['timeout'] = False
             result['out'] = out
         except subprocess.TimeoutExpired:
             result = {
                     'plan-found': False,
                     'timeout': True,
-                    'elapsed': timeout,
             }
         except subprocess.CalledProcessError as e:
             result = {
@@ -47,13 +38,12 @@ class CmdPlanner:
             }
         return result
 
-    def __call__(self, domain, problem, stch_dom=None):
-        with PddlDomainFile(domain, self.round_costs) as domain_f:
-            with PddlProblemFile(problem) as problem_f:
-                result = self.run_planner(domain_f.filename, problem_f.filename)
-        if stch_dom and result['plan-found']:
-            plan = result['plan']
-            result['success-probability'] = success_probability(stch_dom, plan)
+    def __call__(self, problem):
+        with NamedTemporaryFile(prefix="domain", suffix=".pddl") as fdomain,\
+             NamedTemporaryFile(prefix="problem", suffix=".pddl") as fproblem:
+            fdomain.write(str(problem.domain).encode("ascii"))
+            fproblem.write(str(problem).encode("ascii"))
+            result = self.run_planner(fdomain.name, fproblem.name)
         return result
 
 
@@ -69,16 +59,10 @@ class FFPlanner(CmdPlanner):
     SUPPORTS_TIMEOUT = False
 
     def get_cmd(self, domain_file, problem_file):
-        parameters = self.parameters
-        cmd = ['ff', '-o', domain_file, '-f', problem_file]
-        if 's' in parameters:
-            cmd += ['-s', str(parameters['s'])]
-        if 'w' in parameters:
-            cmd += ['-w', str(parameters['w'])]
-        if parameters.get('C', False):
-            cmd.append('-C')
-        if 'b' in parameters:
-            cmd += ['-b', str(parameters['-b'])]
+        cmd = ["ff", "-o", domain_file, "-f", problem_file]
+        cmd += list(self.args)
+        for opt,val in self.kwargs.items():
+            cmd += ["-"+opt, str(val)]
         return cmd
 
     @staticmethod
@@ -102,18 +86,6 @@ class FFPlanner(CmdPlanner):
         return result
 
 
-# Solution found!
-# Actual search time: 0.000454614s [t=0.00246033s]
-# pick-up_o0 b1 b4 (0)
-# put-on-block_o0 b1 b1 (11)
-# pick-up_o0 b3 b2 (0)
-# put-on-block_o0 b3 b3 (11)
-# pick-up_o0 b4 b5 (0)
-# put-down_o1 b4 (51)
-# pick-up-from-table_o0 b2 (0)
-# put-on-block_o0 b2 b4 (11)
-# Plan length: 8 step(s).
-# Plan cost: 84
 FD_REGEX = re.compile(
 r"""Solution found!
 Actual search time: (?P<elapsed>[0-9\.]+s) \[t=[0-9\.]+s\]
