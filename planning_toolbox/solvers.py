@@ -1,5 +1,6 @@
 import re
 import subprocess
+import time
 
 from tempfile import NamedTemporaryFile
 
@@ -7,8 +8,8 @@ from tempfile import NamedTemporaryFile
 class CmdPlanner:
 
     def __init__(self, *args, **kwargs):
-        self.parameters = parameters
-        self.round_costs = round_costs
+        self.args = args
+        self.kwargs = kwargs
 
     def get_cmd(self, domain_file, problem_file):
         raise NotImplementedError()
@@ -18,71 +19,84 @@ class CmdPlanner:
 
     def run_planner(self, domain_file, problem_file, timeout=None):
         cmd = self.get_cmd(domain_file, problem_file)
-        parameters = self.parameters
-        timeout = None if self._supports_timeout_() else parameters.get('timeout', None)
+        start = time.time()
         try:
-            out = subprocess.check_output(cmd)
-            out = out.decode('ascii')
-            result = self._parse_out_(out)
-            result['timeout'] = False
-            result['out'] = out
+            process = subprocess.run(cmd, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, timeout=timeout)
+            stdout = process.stdout.decode("ascii")
+            stderr = process.stderr.decode("ascii")
+            result = self._parse_out_(stdout)
+            result["timeout"] = False
+            result["stdout"] = stdout
+            result["stderr"] = stderr
         except subprocess.TimeoutExpired:
             result = {
-                    'plan-found': False,
-                    'timeout': True,
+                    "plan-found": False,
+                    "timeout": True,
             }
         except subprocess.CalledProcessError as e:
+            # print(e)
+            # print(e.stderr)
             result = {
-                    'plan-found': False,
-                    'out': e.output.decode('ascii')
+                    "plan-found": False,
+                    "timeout": False,
+                    "stdout": e.stdout.decode("ascii"),
+                    "stderr": e.stderr.decode("ascii"),
             }
+        result["time-wall"] = time.time() - start
         return result
 
-    def __call__(self, problem):
-        with NamedTemporaryFile(prefix="domain", suffix=".pddl") as fdomain,\
-             NamedTemporaryFile(prefix="problem", suffix=".pddl") as fproblem:
+    def __call__(self, problem, timeout=None):
+        with NamedTemporaryFile(prefix="domain_", suffix=".pddl", buffering=0) as fdomain,\
+             NamedTemporaryFile(prefix="problem_", suffix=".pddl", buffering=0) as fproblem:
             fdomain.write(str(problem.domain).encode("ascii"))
             fproblem.write(str(problem).encode("ascii"))
-            result = self.run_planner(fdomain.name, fproblem.name)
+            result = self.run_planner(fdomain.name, fproblem.name, timeout=timeout)
         return result
 
-
-FF_REGEX = re.compile(
-r"""ff: found legal plan as follows
-step\s*(?P<actions>(?:[0-9]+: [\sA-Z_0-9\-]*)*)
-plan cost: (?P<cost>[0-9]+\.[0-9]*)""")
-
-FF_ELAPSED = re.compile(r"(?P<elapsed>[0-9]+\.[0-9]+) seconds total time")
 
 class FFPlanner(CmdPlanner):
 
-    SUPPORTS_TIMEOUT = False
+    RE_ACTION = re.compile(r"(?:step|)\s*\d+: ([A-Z0-9_\- ]+)")
+    RE_PLAN_COST = re.compile(r"plan cost: ([0-9\.]+)")
+    RE_ELAPSED = re.compile(r"\s*([0-9\.]+) seconds total time")
 
     def get_cmd(self, domain_file, problem_file):
         cmd = ["ff", "-o", domain_file, "-f", problem_file]
-        cmd += list(self.args)
-        for opt,val in self.kwargs.items():
-            cmd += ["-"+opt, str(val)]
+        cmd += get_options(*self.args, **self.kwargs)
         return cmd
 
-    @staticmethod
-    def _process_actions_(actions):
-        if not actions:
-            return []
-        actions_ = actions.lower().split('\n')
-        plan = map(lambda a: tuple(a.split(':')[1].split()), actions_)
-        return list(plan)
-
     def _parse_out_(self, out):
-        result = dict()
-        match_plan = FF_REGEX.search(out)
-        match_elapsed = FF_ELAPSED.search(out)
-        result['plan-found'] = match_plan is not None
-        if match_plan:
-            result['plan'] = FFPlanner._process_actions_(match_plan.group('actions'))
-            result['total-cost'] = float(match_plan.group('cost'))
-        if match_elapsed:
-            result['elapsed'] = float(match_elapsed.group('elapsed'))
+        result = {}
+        lines = out.splitlines()
+        total_cost = None
+        total_elapsed = None
+        try:
+            idx_start_plan = lines.index("ff: found legal plan as follows")
+            actions = []
+            reading_actions = True
+            for l in lines[idx_start_plan+1:]:
+                if reading_actions:
+                    mact = FFPlanner.RE_ACTION.match(l)
+                    if mact:
+                        action = tuple(mact.group(1).lower().split())
+                        actions.append(action)
+                    else:
+                        reading_actions = False
+                        mcost = FFPlanner.RE_PLAN_COST.match(l)
+                        if mcost: total_cost = float(mcost.group(1))
+                else:
+                    melap = FFPlanner.RE_ELAPSED.match(l)
+                    if melap:
+                        total_elapsed = float(melap.group(1))
+                        break   
+            result["plan-found"] = True
+            result["plan"] = actions
+        except ValueError:
+            result["plan-found"] = False
+            result["plan"] = None
+        result["total-cost"] = total_cost
+        result["total-elapsed"] = total_elapsed
         return result
 
 
@@ -99,30 +113,37 @@ class FDPlanner(CmdPlanner):
 
     def get_cmd(self, domain_file, problem_file):
         cmd = ["fast-downward.py", domain_file, problem_file]
-        parameters = self.parameters
-        heuristic = parameters.get("h", "add")
-        assert heuristic in ("hmax", "add", "ff", "cea", "cg", "lmcut", "lmcount", "ipdbs")
-        timeout = self.parameters.get("timeout", None)
-        if timeout:
-            cmd += ["--search", "astar({}(), max_time={})".format(heuristic)]
-            pass
-        else:
-            cmd += ["--search", "astar({}())".format(heuristic, timeout)]
+        cmd += get_options(*self.args, **self.kwargs)
         return cmd
 
-    @staticmethod
-    def _process_actions_(actions):
-        splitted = actions.split("\n")[:-1]
-        plan = list(map(lambda s: tuple(s.split())[:-1], splitted))
-        return plan
+    # @staticmethod
+    # def _process_actions_(actions):
+        # splitted = actions.split("\n")[:-1]
+        # plan = list(map(lambda s: tuple(s.split())[:-1], splitted))
+        # return plan
 
-    def _parse_out_(self, out):
-        match = FD_REGEX.search(out)
-        result = dict()
-        result["plan-found"] = match is not None
-        if match:
-            result["plan"] = FDPlanner._process_actions_(match.group("actions"))
-            result["total-cost"] = match.group("cost")
-            result["elapsed"] = match.group("elapsed")
-        return result
+    # def _parse_out_(self, out):
+        # match = FD_REGEX.search(out)
+        # result = dict()
+        # result["plan-found"] = match is not None
+        # if match:
+            # result["plan"] = FDPlanner._process_actions_(match.group("actions"))
+            # result["total-cost"] = match.group("cost")
+            # result["elapsed"] = match.group("elapsed")
+        # return result
+
+
+#############
+# UTILITIES #
+#############
+
+def get_options(*args, **kwargs):
+    options = list(args)
+    for opt,val in kwargs.items():
+        prefixed_opt = ("--" if len(opt) > 1 else "-") + opt
+        if isinstance(val, bool):
+            if val: options.append(prefixed_opt)
+        else:
+            options += [prefixed_opt, str(val)]
+    return options
 

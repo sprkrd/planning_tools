@@ -1156,29 +1156,29 @@ class Problem:
         return ret
 
 
-class State:
+# class State:
 
-    def __init__(self, predicates=None, functions=None, problem=None):
-        self.predicates = set() if predicates is None else predicates
-        self.functions = {} if functions is None else functions
-        self.total_cost = None
-        self.reward = None
+    # def __init__(self, predicates=None, functions=None, problem=None):
+        # self.predicates = set() if predicates is None else predicates
+        # self.functions = {} if functions is None else functions
+        # self.total_cost = None
+        # self.reward = None
 
-    def add_predicate(self, predicate):
-        pass
+    # def add_predicate(self, predicate):
+        # pass
 
-    def delete_predicate(self, predicate):
-        pass
+    # def delete_predicate(self, predicate):
+        # pass
 
-    def set_function_value(self, function, value):
-        if function.name == "total-cost":
-            self.total_cost = value
-        elif function.name == "reward":
-            self.reward = value
-        else self.functions[
+    # def set_function_value(self, function, value):
+        # if function.name == "total-cost":
+            # self.total_cost = value
+        # elif function.name == "reward":
+            # self.reward = value
+        # else self.functions[
 
-    def __hash__(self):
-        return hash(frozenset(self.predicates))
+    # def __hash__(self):
+        # return hash(frozenset(self.predicates))
 
 
 ####################

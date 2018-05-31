@@ -294,7 +294,7 @@ def process_problem(tree, domain):
     return problem
 
 
-def parse(text, type_="domain"):
+def parse(text, type_="domain", domain=None):
     assert type_ in ("raw", "domain", "problem", "both")
     text_wo_comments = remove_comments(text)
     tokens = tokenize(text_wo_comments)
@@ -304,15 +304,15 @@ def parse(text, type_="domain"):
     elif type_ == "domain":
         return process_domain(read_from_tokens(tokens))
     elif type_ == "problem":
-        return process_problem(read_from_tokens(tokens))
+        return process_problem(read_from_tokens(tokens), domain)
     else: # type_ == both
         domain = process_domain(read_from_tokens(tokens))
         problem = process_problem(read_from_tokens(tokens), domain)
         return domain, problem
 
 
-def parse_file(filename, type_="domain"):
+def parse_file(filename, type_="domain", domain=None):
     with open(filename,"r") as f:
         text = f.read()
-    return parse(text, type_)
+    return parse(text, type_, domain)
 
