@@ -842,7 +842,7 @@ class AssignmentEffect(Effect):
                 self.assignop = "increase"
                 if isinstance(self.rhs, Constant):
                     self.rhs.constant = self.rhs.constant*alpha + inters
-                    if round_ > 0: self.rhs = round(self.rhs*10**round_)
+                    if round_ > 0: self.rhs.constant = int(round(self.rhs.constant*10**round_))
             else: return EmptyEffect()
         return self
 

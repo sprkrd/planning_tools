@@ -71,6 +71,7 @@ class FFPlanner(CmdPlanner):
         lines = out.splitlines()
         total_cost = None
         total_elapsed = None
+        actions = None
         try:
             idx_start_plan = lines.index("ff: found legal plan as follows")
             actions = []
@@ -91,46 +92,65 @@ class FFPlanner(CmdPlanner):
                         total_elapsed = float(melap.group(1))
                         break   
             result["plan-found"] = True
-            result["plan"] = actions
         except ValueError:
             result["plan-found"] = False
-            result["plan"] = None
-        result["total-cost"] = total_cost
+        result["plan"] = actions
+        if total_cost is None:
+            result["total-cost"] = None if actions is None else len(actions)
+        else:
+            result["total-cost"] = total_cost
         result["total-elapsed"] = total_elapsed
         return result
 
 
-FD_REGEX = re.compile(
-r"""Solution found!
-Actual search time: (?P<elapsed>[0-9\.]+s) \[t=[0-9\.]+s\]
-(?P<actions>(?:[ a-z_0-9\-]+ \([0-9]+\)
-)+)Plan length: [0-9]+ step\(s\)\.
-Plan cost: (?P<cost>[0-9]+)""")
-
 class FDPlanner(CmdPlanner):
 
-    SUPPORTS_TIMEOUT = True
+    RE_ACTION = re.compile(r"([A-Za-z0-9_\- ]+) \([0-9]+\)")
+    RE_PLAN_COST = re.compile(r"Plan cost: ([0-9]+)")
+    RE_ELAPSED = re.compile(r"Total time: ([0-9\.]+)s")
 
     def get_cmd(self, domain_file, problem_file):
         cmd = ["fast-downward.py", domain_file, problem_file]
         cmd += get_options(*self.args, **self.kwargs)
         return cmd
 
-    # @staticmethod
-    # def _process_actions_(actions):
-        # splitted = actions.split("\n")[:-1]
-        # plan = list(map(lambda s: tuple(s.split())[:-1], splitted))
-        # return plan
-
-    # def _parse_out_(self, out):
-        # match = FD_REGEX.search(out)
-        # result = dict()
-        # result["plan-found"] = match is not None
-        # if match:
-            # result["plan"] = FDPlanner._process_actions_(match.group("actions"))
-            # result["total-cost"] = match.group("cost")
-            # result["elapsed"] = match.group("elapsed")
-        # return result
+    def _parse_out_(self, out):
+        result = {}
+        lines = out.splitlines()
+        total_cost = None
+        total_elapsed = None
+        actions = None
+        try:
+            idx_start_plan = lines.index("Solution found!")
+            actions = []
+            reading_actions = True
+            reading_cost = False
+            for l in lines[idx_start_plan+2:]:
+                if reading_actions:
+                    mact = FDPlanner.RE_ACTION.match(l)
+                    if mact:
+                        action = tuple(mact.group(1).split())
+                        actions.append(action)
+                    else:
+                        reading_actions = False
+                        reading_cost = True
+                elif reading_cost:
+                    mcost = FDPlanner.RE_PLAN_COST.match(l)
+                    if mcost:
+                        total_cost = int(mcost.group(1))
+                        reading_cost = False
+                else:
+                    melap = FDPlanner.RE_ELAPSED.match(l)
+                    if melap:
+                        total_elapsed = float(melap.group(1))
+                        break   
+            result["plan-found"] = True
+        except ValueError:
+            result["plan-found"] = False
+        result["plan"] = actions
+        result["total-cost"] = total_cost
+        result["total-elapsed"] = total_elapsed
+        return result
 
 
 #############
