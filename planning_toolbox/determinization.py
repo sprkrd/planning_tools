@@ -118,6 +118,10 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
         return problem
 
 
+class HindsightDeterminizer(Determinizer):
+    pass
+
+
 #############
 # UTILITIES #
 #############

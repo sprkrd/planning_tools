@@ -73,7 +73,7 @@ class ObjectList:
         return self.objects == other.objects
 
     def __hash__(self):
-        return hash(self.objects)
+        return hash(tuple(self.objects))
 
     def __str__(self):
         ret = ""
@@ -189,7 +189,7 @@ class PredicateQuery(Query):
         self.predicate = predicate
 
     def eval(self, state):
-        raise NotImplementedError()
+        return state.has_predicate(self.predicate)
 
     def bind(self, sigma):
         return PredicateQuery(self.predicate.bind(sigma))
@@ -210,7 +210,7 @@ class FunctionQuery(Query):
         self.function = function
 
     def eval(self, state):
-        raise NotImplementedError()
+        return state.get_function_value(self.function)
 
     def bind(self, sigma):
         return FunctionQuery(self.function.bind(sigma))
@@ -411,10 +411,12 @@ class ForallQuery(Query):
         self.query = query
 
     def eval(self, state):
-        raise NotImplementedError()
+        return all(self.query.bind(sigma).eval(state)
+                for sigma in all_possible_assignments(state.problem, self.parameters))
+
 
     def bind(self, sigma):
-        return ForallQuery(self.parameters.bind(sigma), self.query.bind(sigma))
+        return ForallQuery(self.parameters, self.query.bind(sigma))
 
     def is_empty(self):
         return self.query.is_empty()
@@ -435,7 +437,8 @@ class ExistsQuery(Query):
         self.query = query
 
     def eval(self, state):
-        raise NotImplementedError()
+        raise any(self.query.bind(sigma).eval(state)
+                for sigma in all_possible_assignments(state.problem, self.parameters))
 
     def bind(self, sigma):
         return ExistsQuery(self.parameters.bind(sigma), self.query.bind(sigma))
@@ -500,7 +503,7 @@ class Effect:
 class EmptyEffect(Effect):
 
     def apply(self, state, out=None):
-        return state.copy() if out is None else out
+        return out or state.copy()
 
     def bind(self, sigma):
         return self
@@ -539,7 +542,9 @@ class AddEffect(Effect):
         self.add = add
 
     def apply(self, state, out=None):
-        raise NotImplementedError()
+        out = out or state.copy()
+        out.add_predicate(self.add)
+        return out
 
     def bind(self, sigma):
         return AddEffect(self.add.bind(sigma))
@@ -578,7 +583,9 @@ class DeleteEffect(Effect):
         self.delete = delete
 
     def apply(self, state, out=None):
-        raise NotImplementedError()
+        out = out or state.copy()
+        out.delete_predicate(self.delete)
+        return out
 
     def bind(self, sigma):
         return DeleteEffect(self.delete.bind(sigma))
@@ -617,7 +624,7 @@ class AndEffect(Effect):
         self.effects = list(effects)
 
     def apply(self, state, out=None):
-        if out is None: out = state.copy()
+        out = out or state.copy()
         for effect in self.effects:
             out = effect.apply(state, out)
         return out
@@ -699,7 +706,10 @@ class ForallEffect(Effect):
         self.effect = effect
 
     def apply(self, state, out=None):
-       raise NotImplementedError() 
+       out = out or state.copy()
+       for sigma in all_possible_assignments(state.problem, self.parameters):
+           out = self.effect.bind(sigma).apply(state, out)
+       return out
 
     def bind(self, sigma):
         return TotalEffect(self.parameters.bind(sigma), self.effect.bind(sigma))
@@ -803,7 +813,15 @@ class AssignmentEffect(Effect):
         self.rhs = rhs
 
     def apply(self, state, out=None):
-        raise NotImplementedError()
+        out = out or state.copy()
+        lhs = state.get_function_value(self.lhs)
+        rhs = self.rhs.eval(state)
+        if self.assignop == "assign": out.set_function_value(self.lhs, rhs)
+        elif self.assignop == "increase": out.set_function_value(self.lhs, lhs+rhs)
+        elif self.assignop == "decrease": out.set_function_value(self.lhs, lhs-rhs)
+        elif self.assignop == "scale-up": out.set_function_value(self.lhs, lhs*rhs)
+        else: out.set_function_value(self.lhs, lhs/rhs)
+        return out
 
     def count_additive_effects(self):
         return 0
@@ -956,10 +974,12 @@ class Action:
         self.effect = EmptyEffect() if effect is None else effect
 
     def is_applicable(self, state):
-        raise NotImplementedError()
+        return self.precondition.eval(state)
 
     def apply(self, state):
-        raise NotImplementedError()
+        if self.precondition.eval(state):
+            return self.effect.apply(state)
+        return one
 
     def bind(self, sigma):
         return Action(self.name, self.parameters.bind(sigma),
@@ -973,6 +993,12 @@ class Action:
 
     def modified_functions(self):
         return self.effect.modified_functions()
+
+    def tuple_representation(self):
+        return (self.name,*(obj.name for obj in self.parameters))
+
+    def short_str(self):
+        return "({})".format(" ".join(self.tuple_representation()))
 
     def __str__(self):
         ret = "(:action {}\n".format(self.name)
@@ -1104,7 +1130,9 @@ class InitialState:
         return deepcopy(self)
 
     def get_state(self):
-        pass
+        # [TODO] Probabilistic
+        return SymbolicState(self.predicates, self.functions)
+
 
     def __str__(self):
         ret = "(:init\n  "
@@ -1133,6 +1161,23 @@ class Problem:
         self.init = InitialState() if init is None else init
         self.goal = Goal(EmptyQuery()) if goal is None else goal
 
+    def all_objects_of_type(self, type_=None):
+        objects_of_type = []
+        for obj in self.objects:
+            inferred = inferred_types(self.domain.type_hierarchy, obj.type)
+            if type_ in inferred: objects_of_type.append(obj.name)
+        return objects_of_type
+
+    def ground_operators(self):
+        for action in self.domain.actions:
+            for sigma in all_possible_assignments(self, action.parameters):
+                yield action.bind(sigma)
+
+    def get_initial_state(self):
+        s0 = self.init.get_state()
+        s0.problem = self
+        return s0
+
     def copy(self):
         return Problem(self.name, self.domain, self.objects.copy(),
                 self.init.copy(), self.goal.copy())
@@ -1156,29 +1201,69 @@ class Problem:
         return ret
 
 
-# class State:
+class SymbolicState:
 
-    # def __init__(self, predicates=None, functions=None, problem=None):
-        # self.predicates = set() if predicates is None else predicates
-        # self.functions = {} if functions is None else functions
-        # self.total_cost = None
-        # self.reward = None
+    def __init__(self, predicates=None, functions=None, problem=None):
+        self.predicates = set() if predicates is None else set(predicates)
+        self.total_cost = 0
+        self.reward = 0
+        if functions is not None:
+            for fun, val in functions.items():
+                self.set_function_value(fun, val)
+        self.problem = problem
+        self._hash = None
 
-    # def add_predicate(self, predicate):
-        # pass
+    def add_predicate(self, predicate):
+        self.predicates.add(predicate)
+        self._hash = None
 
-    # def delete_predicate(self, predicate):
-        # pass
+    def delete_predicate(self, predicate):
+        self.predicates.discard(predicate)
+        self._hash = None
 
-    # def set_function_value(self, function, value):
-        # if function.name == "total-cost":
-            # self.total_cost = value
-        # elif function.name == "reward":
-            # self.reward = value
-        # else self.functions[
+    def copy(self):
+        clone = SymbolicState(self.predicates.copy(), problem=self.problem)
+        clone.total_cost = self.total_cost
+        clone.reward = self.reward
+        return clone
 
-    # def __hash__(self):
-        # return hash(frozenset(self.predicates))
+    def has_predicate(self, predicate):
+        return predicate in self.predicates
+
+    def set_function_value(self, function, value):
+        if function.name == "total-cost":
+            self.total_cost = value
+        elif function.name == "reward":
+            self.reward = value
+        else:
+            raise Exception("Arbitrary functions not implemented")
+
+    def get_function_value(self, function):
+        if function.name == "total-cost":
+            return self.total_cost
+        if function.name == "reward":
+            return self.reward
+        raise Exception("Non-supported function: {}".format(function.name))
+
+    def applicable_actions(self):
+        for grop in self.problem.ground_operators():
+            if grop.is_applicable(self):
+                yield grop
+
+    def __hash__(self):
+        if self._hash is None:
+            self._hash = hash(frozenset(self.predicates))
+        return self._hash
+
+    def __eq__(self, other):
+        return self.predicates == other.predicates
+
+    def __str__(self):
+        ret = "State from problem " + self.problem.name + ":\n  "
+        ret += "\n  ".join(p for p in sorted(str(p_) for p_ in self.predicates))
+        ret += "\n  Total cost: " + str(self.total_cost)
+        ret += "\n  Reward: " + str(self.reward)
+        return ret
 
 
 ####################
@@ -1244,4 +1329,12 @@ def inferred_types(hierarchy, type_):
         type_ = hierarchy[type_]
     inferred.append("object") # every type is descendent of object
     return inferred
+
+
+def all_possible_assignments(problem, objlist):
+    objects = []
+    for obj in objlist:
+        objects.append(problem.all_objects_of_type(obj.type))
+    varnames = [obj.name for obj in objlist]
+    return (dict(zip(varnames, values)) for values in product(*objects))
 

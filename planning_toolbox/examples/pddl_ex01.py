@@ -3,36 +3,109 @@ from ..pddl import *
 
 
 def main():
-    name = "hanoi"
-    requirements = [":strips", ":equality", ":rewards"]
+    requirements = [":strips", ":adl"]
     types = ["disk", "peg"]
     predicates = [
             Predicate("clear", ("?o", "object")),
             Predicate("on", ("?d", "disk"), ("?o", "object")),
             Predicate("smaller", ("?d", "disk"), ("?o", "object")),
     ]
+    # actions = [
+        # Action("move",
+            # ObjectList(("?from", "object"), ("?to", "object"), ("?what", "disk")),
+            # AndQuery(
+                # PredicateQuery(Predicate("clear", "?to")),
+                # PredicateQuery(Predicate("clear", "?what")),
+                # PredicateQuery(Predicate("smaller", "?what", "?to")),
+                # PredicateQuery(Predicate("on", "?what", "?from")),
+            # ),
+            # AndEffect(
+                # AddEffect(Predicate("on", "?what", "?to")),
+                # AddEffect(Predicate("clear", "?from")),
+                # DeleteEffect(Predicate("on", "?what", "?from")),
+                # DeleteEffect(Predicate("clear", "?to")),
+                # AssignmentEffect("increase", Function("total-cost"), Constant(1))
+            # )
+        # )
+    # ]
     actions = [
         Action("move",
             ObjectList(("?from", "object"), ("?to", "object"), ("?what", "disk")),
             AndQuery(
-                PredicateQuery(Predicate("clear", "?to")),
-                PredicateQuery(Predicate("clear", "?what")),
+                ForallQuery(
+                    ObjectList(("?d", "disk")),
+                    AndQuery(
+                        NotQuery(PredicateQuery(Predicate("on", "?d", "?what"))),
+                        NotQuery(PredicateQuery(Predicate("on", "?d", "?to"))),
+                    )
+                ),
                 PredicateQuery(Predicate("smaller", "?what", "?to")),
                 PredicateQuery(Predicate("on", "?what", "?from")),
             ),
             AndEffect(
                 AddEffect(Predicate("on", "?what", "?to")),
-                AddEffect(Predicate("clear", "?from")),
                 DeleteEffect(Predicate("on", "?what", "?from")),
-                DeleteEffect(Predicate("clear", "?to")),
+                AssignmentEffect("increase", Function("total-cost"), Constant(1))
             )
         )
     ]
+    functions = [Function("total-cost")]
 
-    domain = Domain(name, requirements, types, None, predicates, None, actions)
+    objects = ObjectList(
+            ("peg1", "peg"),
+            ("peg2", "peg"),
+            ("peg3", "peg"),
+            ("d1", "disk"),
+            ("d2", "disk"),
+            ("d3", "disk")
+    )
+    init = InitialState([
+        Predicate("smaller", "d1", "peg1"),
+        Predicate("smaller", "d1", "peg2"),
+        Predicate("smaller", "d1", "peg3"),
+        Predicate("smaller", "d2", "peg1"),
+        Predicate("smaller", "d2", "peg2"),
+        Predicate("smaller", "d2", "peg3"),
+        Predicate("smaller", "d3", "peg1"),
+        Predicate("smaller", "d3", "peg2"),
+        Predicate("smaller", "d3", "peg3"),
+        Predicate("smaller", "d1", "d2"),
+        Predicate("smaller", "d1", "d3"),
+        Predicate("smaller", "d2", "d3"),
+        Predicate("on", "d3", "peg1"),
+        Predicate("on", "d2", "d3"),
+        Predicate("on", "d1", "d2"),
+        # Predicate("clear", "d1"),
+        # Predicate("clear", "peg2"),
+        # Predicate("clear", "peg3"),
+    ], {
+        Function("total-cost"): 0,
+    })
+    goal = Goal(AndQuery(
+        PredicateQuery(Predicate("on", "d3", "peg3")),
+        PredicateQuery(Predicate("on", "d2", "d3")),
+        PredicateQuery(Predicate("on", "d1", "d2")),
+    ), metric=("minimize", FunctionQuery(Function("total-cost")))
+    )
+
+
+    domain = Domain("hanoi", requirements, types, None, predicates, functions, actions)
+    problem = Problem("hanoi-03", domain, objects, init, goal)
+
     print(domain)
-    print(" ".join(str(p) for p in domain.get_static_predicates()))
-    print(" ".join(str(p) for p in domain.get_static_functions()))
+    print(problem)
+
+    s0 = problem.get_initial_state()
+    print(s0)
+    
+    for a in s0.applicable_actions():
+        print(a.short_str())
+        s1 = a.apply(s0)
+        print(s1)
+    
+
+    # print(" ".join(str(p) for p in domain.get_static_predicates()))
+    # print(" ".join(str(p) for p in domain.get_static_functions()))
 
     # print(actions[0].bind({"?from": "a", "?to": "c", "?what": "b"}))
 
