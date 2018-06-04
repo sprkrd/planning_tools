@@ -8,8 +8,8 @@ from ..simulation import *
 def main(filepath):
     sdomain, sproblem = parse_file(filepath, "both")
     # determinizer = AllOutcomeDeterminizer()
-    determinizer = AlphaCostLikelihoodDeterminizer(round_=2)
-    # determinizer = HindsightDeterminizer("global", 30)
+    # determinizer = AlphaCostLikelihoodDeterminizer(round_=2)
+    determinizer = HindsightDeterminizer("global", 20, False)
     determinizer.set_domain(sdomain)
     problem = determinizer(sproblem)
     print(problem.domain)

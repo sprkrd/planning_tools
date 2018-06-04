@@ -50,7 +50,7 @@ class AllOutcomeDeterminizer(Determinizer):
         actions = []
         for a in domain.actions:
             assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
-            for idx, (_, e) in enumerate(a.effect):
+            for idx, (p, e) in enumerate(a.effect):
                 if e.is_empty() or p < 1e-6: continue
                 anew = a.copy()
                 anew.name = anew.name + "_o" + str(idx)
@@ -140,14 +140,15 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
 
 class HindsightDeterminizer(Determinizer):
     
-    def __init__(self, method="global", wheel_size=10):
+    def __init__(self, method="global", wheel_size=10, transform_rewards=False):
         assert method in ("global", "local")
         self.method = method
         self.wheel_size = wheel_size
+        self.transform_rewards = transform_rewards
 
     def _determinize_domain_global(self, domain):
         domain.remove_mdp_requirements()
-        domain.remove_reward_assignments()
+        if not self.transform_rewards: domain.remove_reward_assignments()
         domain.type_hierarchy["timestep"] = None
         domain.predicates.append(Predicate("current_timestep", ("?t", "timestep")))
         domain.predicates.append(Predicate("next_timestep",
@@ -159,6 +160,8 @@ class HindsightDeterminizer(Determinizer):
                 anew = a.copy()
                 anew.name += "_o" + str(idx)
                 anew.effect = e.copy()
+                if self.transform_rewards:
+                    anew.effect = anew.effect.transform_rewards_to_costs()
                 anew.parameters.objects.append(Object("?tn_1", "timestep"))
                 anew.parameters.objects.append(Object("?tn", "timestep"))
                 new_queries = [
@@ -187,7 +190,7 @@ class HindsightDeterminizer(Determinizer):
 
     def _determinize_domain_local(self, domain):
         domain.remove_mdp_requirements()
-        domain.remove_reward_assignments()
+        if not self.transform_rewards: domain.remove_reward_assignments()
         domain.type_hierarchy["status"] = None
         domain.predicates.append(Predicate("next_status",
             ("?sn_1", "status"), ("?sn", "status")))
@@ -200,6 +203,8 @@ class HindsightDeterminizer(Determinizer):
                 anew = a.copy()
                 anew.name += "_o" + str(idx)
                 anew.effect = e.copy()
+                if self.transform_rewards:
+                    anew.effect = anew.effect.transform_rewards_to_costs()
                 if len(a.effect) > 1:
                     anew.parameters.objects.append(Object("?sn_1", "status"))
                     anew.parameters.objects.append(Object("?sn", "status"))
@@ -232,6 +237,10 @@ class HindsightDeterminizer(Determinizer):
 
     def _determinize_problem_global(self, problem):
         problem.remove_mdp_features()
+        if self.transform_rewards:
+            tcfun = Function("total-cost")
+            problem.init.functions[tcfun] = 0
+            problem.goal.metric = ("minimize", tcfun)
         for idx in range(self.wheel_size):
             problem.objects.objects.append(Object("t"+str(idx), "timestep"))
         problem.init.predicates.append(Predicate("current_timestep", "t0"))
@@ -250,6 +259,10 @@ class HindsightDeterminizer(Determinizer):
 
     def _determinize_problem_local(self, problem):
         problem.remove_mdp_features()
+        if self.transform_rewards:
+            tcfun = Function("total-cost")
+            problem.init.functions[tcfun] = 0
+            problem.goal.metric = ("minimize", tcfun)
         for idx in range(self.wheel_size):
             problem.objects.objects.append(Object("s"+str(idx), "status"))
         for a in self.preprocessed_domain.actions:

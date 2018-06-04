@@ -979,7 +979,10 @@ class Action:
 
     def apply(self, state):
         if self.precondition.eval(state):
-            return self.effect.apply(state)
+            new_state = self.effect.apply(state)
+            if state.problem.goal.reward and state.problem.goal.query.eval(new_state):
+                new_state.reward += state.problem.goal.reward
+            return new_state
         return None
 
     def bind(self, sigma):
@@ -1134,6 +1137,9 @@ class InitialState:
         # [TODO] Probabilistic
         return SymbolicState(self.predicates, self.functions)
 
+    def erase_reward(self):
+        try: del self.functions[Function("reward")]
+        except KeyError: pass
 
     def __str__(self):
         ret = "(:init\n  "
@@ -1177,6 +1183,7 @@ class Problem:
     def get_initial_state(self):
         s0 = self.init.get_state()
         s0.problem = self
+        if self.domain.allows_reward_fluent(): s0.reward = 0
         return s0
 
     def copy(self):
@@ -1189,6 +1196,7 @@ class Problem:
             metricfun = self.goal.metric[1]
             if isinstance(metricfun, FunctionQuery) and metricfun.function.name == "reward":
                 self.goal.metric = None
+        self.init.erase_reward()
         return self
 
     def __str__(self):
@@ -1271,7 +1279,9 @@ class SymbolicState:
     def __str__(self):
         ret = "State from problem " + self.problem.name + ":\n  "
         ret += "\n  ".join(p for p in sorted(str(p_) for p_ in self.predicates))
+        # if self.total_cost is not None:
         ret += "\n  Total cost: " + str(self.total_cost)
+        # if self.reward is not None:
         ret += "\n  Reward: " + str(self.reward)
         return ret
 

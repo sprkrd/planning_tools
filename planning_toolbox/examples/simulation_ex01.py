@@ -41,7 +41,7 @@ def main(filepath):
             p, base_plan = determinizer.process_plan_trace(result["plan"])
             print("%success: {}%".format(100*p))
             print("base plan: " + str(base_plan))
-            done, next_state = sim.step(base_plan[0])
+            done, _, next_state = sim.step(base_plan[0])
             next_state.total_cost = result["total-cost"]
             print(next_state)
             problem.init = next_state.to_initial_state()
