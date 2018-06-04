@@ -5,9 +5,14 @@ from functools import reduce
 from itertools import product
 
 from math import log
+from random import random
+
+import re
 
 
 class Determinizer:
+
+    RE_ACTION = re.compile(r"([a-zA-Z0-9_\-]+)_o([0-9]+)")
 
     def set_domain(self, original_domain):
         self.original_domain = original_domain
@@ -19,6 +24,16 @@ class Determinizer:
 
     def determinize_problem(self, problem):
         raise NotImplementedError()
+
+    def process_plan_trace(self, plan):
+        probability = 1.0
+        processed_plan = []
+        for a in plan:
+            m = Determinizer.RE_ACTION.match(a[0])
+            base_action = self.preprocessed_domain.retrieve_action(m.group(1))
+            probability *= base_action.effect[int(m.group(2))][0]
+            processed_plan.append((base_action.name,*a[1:len(base_action.parameters)+1]))
+        return probability, processed_plan
 
     def __call__(self, problem):
         determinized_problem = self.determinize_problem(problem.copy())
@@ -36,6 +51,7 @@ class AllOutcomeDeterminizer(Determinizer):
         for a in domain.actions:
             assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
             for idx, (_, e) in enumerate(a.effect):
+                if e.is_empty() or p < 1e-6: continue
                 anew = a.copy()
                 anew.name = anew.name + "_o" + str(idx)
                 anew.effect = e
@@ -67,6 +83,7 @@ class SingleOutcomeDeterminizer(Determinizer):
             assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
             selected_outcome = None
             for idx, (p, e) in enumerate(a.effect):
+                if e.is_empty() or p < 1e-6: continue
                 score = p if self.strategy == "mlo" else e.count_additive_effects()
                 if selected_outcome is None or score > selected_outcome[1]:
                     selected_outcome = (idx, score, e)
@@ -91,16 +108,19 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
 
     def determinize_domain(self, domain):
         domain.remove_mdp_requirements()
+        if "total-cost" not in (f.name for f in domain.functions):
+            domain.functions.append(Function("total-cost"))
         actions = []
         for a in domain.actions:
             assert isinstance(a.effect, ProbabilisticEffect), str(type(a.effect))
             for idx, (p, e) in enumerate(a.effect):
+                if e.is_empty() or p < 1e-6: continue
                 anew = a.copy()
                 anew.name = anew.name + "_o" + str(idx)
                 anew.effect = e.copy().transform_rewards_to_costs(
                         self.alpha, round_=self.round_)
                 offset = self.base - log(p)
-                if self.round_ > 0: offset = round(offset*10**self.round_)
+                if self.round_ > 0: offset = int(round(offset*10**self.round_))
                 if offset > 1e-6: anew.effect = anew.effect.add_cost_offset(offset)
                 # don't consider actions that only increase the total cost
                 # and don't modify the state in any other way
@@ -119,10 +139,153 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
 
 
 class HindsightDeterminizer(Determinizer):
-    pass
+    
+    def __init__(self, method="global", wheel_size=10):
+        assert method in ("global", "local")
+        self.method = method
+        self.wheel_size = wheel_size
+
+    def _determinize_domain_global(self, domain):
+        domain.remove_mdp_requirements()
+        domain.remove_reward_assignments()
+        domain.type_hierarchy["timestep"] = None
+        domain.predicates.append(Predicate("current_timestep", ("?t", "timestep")))
+        domain.predicates.append(Predicate("next_timestep",
+            ("?tn_1", "timestep"), ("?tn", "timestep")))
+        actions = []
+        for a in domain.actions:
+            for idx, (p, e) in enumerate(a.effect):
+                if p < 1e-6: continue
+                anew = a.copy()
+                anew.name += "_o" + str(idx)
+                anew.effect = e.copy()
+                anew.parameters.objects.append(Object("?tn_1", "timestep"))
+                anew.parameters.objects.append(Object("?tn", "timestep"))
+                new_queries = [
+                        PredicateQuery(Predicate("current_timestep", "?tn_1")),
+                        PredicateQuery(Predicate("next_timestep", "?tn_1", "?tn")),
+                ]
+                if len(a.effect) > 1:
+                    applicable_pred = "applicable_" + anew.name
+                    domain.predicates.append(Predicate(applicable_pred, ("?t", "timestep")))
+                    new_queries.append(PredicateQuery(Predicate(applicable_pred, "?tn_1")))
+                new_effects = [
+                        DeleteEffect(Predicate("current_timestep", "?tn_1")),
+                        AddEffect(Predicate("current_timestep", "?tn")),
+                ]
+                if isinstance(anew.precondition, AndQuery):
+                    anew.precondition.queries += new_queries
+                else:
+                    anew.precondition = AndQuery(anew.precondition, *new_queries)
+                if isinstance(anew.effect, AndEffect):
+                    anew.effect.effects += new_effects
+                else:
+                    anew.effect = AndEffect(anew.effect, *new_effects)
+                actions.append(anew)
+        domain.actions = actions
+        return domain
+
+    def _determinize_domain_local(self, domain):
+        domain.remove_mdp_requirements()
+        domain.remove_reward_assignments()
+        domain.type_hierarchy["status"] = None
+        domain.predicates.append(Predicate("next_status",
+            ("?sn_1", "status"), ("?sn", "status")))
+        actions = []
+        for a in domain.actions:
+            if len(a.effect) > 1:
+                domain.predicates.append(Predicate("status_"+a.name, ("?s", "status")))
+            for idx, (p, e) in enumerate(a.effect):
+                if p < 1e-6: continue
+                anew = a.copy()
+                anew.name += "_o" + str(idx)
+                anew.effect = e.copy()
+                if len(a.effect) > 1:
+                    anew.parameters.objects.append(Object("?sn_1", "status"))
+                    anew.parameters.objects.append(Object("?sn", "status"))
+                    domain.predicates.append(Predicate("applicable_"+anew.name, ("?s", "status")))
+                    new_queries = [
+                            PredicateQuery(Predicate("status_"+a.name, "?sn_1")),
+                            PredicateQuery(Predicate("applicable_"+anew.name, "?sn_1")),
+                            PredicateQuery(Predicate("next_status", "?sn_1", "?sn")),
+                    ]
+                    new_effects = [
+                            DeleteEffect(Predicate("status_"+a.name, "?sn_1")),
+                            AddEffect(Predicate("status_"+a.name, "?sn")),
+                    ]
+                    if isinstance(anew.precondition, AndQuery):
+                        anew.precondition.queries += new_queries
+                    else:
+                        anew.precondition = AndQuery(anew.precondition, *new_queries)
+                    if isinstance(anew.effect, AndEffect):
+                        anew.effect.effects += new_effects
+                    else:
+                        anew.effect = AndEffect(anew.effect, *new_effects)
+                actions.append(anew)
+        domain.actions = actions
+        return domain
+
+    def determinize_domain(self, domain):
+        if self.method == "local":
+            return self._determinize_domain_local(domain)
+        return self._determinize_domain_global(domain)
+
+    def _determinize_problem_global(self, problem):
+        problem.remove_mdp_features()
+        for idx in range(self.wheel_size):
+            problem.objects.objects.append(Object("t"+str(idx), "timestep"))
+        problem.init.predicates.append(Predicate("current_timestep", "t0"))
+        for idx in range(self.wheel_size-1):
+            problem.init.predicates.append(
+                    Predicate("next_timestep", "t"+str(idx), "t"+str(idx+1)))
+        problem.init.predicates.append(
+                Predicate("next_timestep", "t"+str(self.wheel_size-1), "t0"))
+        for a in self.preprocessed_domain.actions:
+            if len(a.effect) > 1:
+                for t in range(self.wheel_size):
+                    outcome = sample_outcome(a)
+                    problem.init.predicates.append(
+                            Predicate("applicable_"+outcome, "t"+str(t)))
+        return problem
+
+    def _determinize_problem_local(self, problem):
+        problem.remove_mdp_features()
+        for idx in range(self.wheel_size):
+            problem.objects.objects.append(Object("s"+str(idx), "status"))
+        for a in self.preprocessed_domain.actions:
+            if len(a.effect) > 1:
+                problem.init.predicates.append(Predicate("status_"+a.name, "s0"))
+        for idx in range(self.wheel_size-1):
+            problem.init.predicates.append(
+                    Predicate("next_status", "s"+str(idx), "s"+str(idx+1)))
+        problem.init.predicates.append(
+                Predicate("next_status", "s"+str(self.wheel_size-1), "s0"))
+        for a in self.preprocessed_domain.actions:
+            if len(a.effect) > 1:
+                for s in range(self.wheel_size):
+                    outcome = sample_outcome(a)
+                    problem.init.predicates.append(
+                            Predicate("applicable_"+outcome, "s"+str(s)))
+        return problem
+
+    def determinize_problem(self, problem):
+        if self.method == "local":
+            return self._determinize_problem_local(problem)
+        return self._determinize_problem_global(problem)
 
 
 #############
 # UTILITIES #
 #############
+
+
+def sample_outcome(action):
+    r = random()
+    acc = 0
+    for idx, (p,e) in enumerate(action.effect):
+        acc += p
+        if r < acc:
+            return action.name + "_o{}".format(idx)
+    return action.name + "_o{}".format(len(action.effect))
+
 

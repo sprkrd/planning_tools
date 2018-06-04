@@ -757,10 +757,10 @@ class ConditionalEffect(Effect):
         self.rhs = rhs
 
     def apply(self, state, out=None):
-        out = super().apply(state, out)
+        out = out or state.copy()
         lhs = self.lhs.eval(state)
         if lhs:
-            out = rhs.apply(state, out)
+            out = self.rhs.apply(state, out)
         return out
 
     def bind(self, sigma):
@@ -933,9 +933,10 @@ class ProbabilisticEffect(Effect):
         return self
 
     def simplify(self):
-        self.effects = [(p,e) for p,e in
-                map(lambda t: (t[0],t[1].simplify()), self.effects)
-                if not e.is_empty() and p > 1e-6]
+        self.effects = [(p,e.simplify()) for p,e in self.effects]
+        # self.effects = [(p,e) for p,e in
+                # map(lambda t: (t[0],t[1].simplify()), self.effects)
+                # if not e.is_empty() and p > 1e-6]
         # if len(self.effects) == 1 and abs(self.effects[0][0] - 1) < 1e-6:
             # return self.effects[0][1]
         if not self.effects:
@@ -979,7 +980,7 @@ class Action:
     def apply(self, state):
         if self.precondition.eval(state):
             return self.effect.apply(state)
-        return one
+        return None
 
     def bind(self, sigma):
         return Action(self.name, self.parameters.bind(sigma),
@@ -1016,7 +1017,7 @@ class Domain:
         self.name = name
         self.requirements = [] if requirements is None else requirements
         self.type_hierarchy = {} if types is None else to_type_hierarchy(types)
-        self.constants = [] if constants is None else constants
+        self.constants = ObjectList() if constants is None else constants
         self.predicates = [] if predicates is None else predicates
         self.functions = [] if functions is None else functions
         self.actions = [] if actions is None else actions
@@ -1205,8 +1206,8 @@ class SymbolicState:
 
     def __init__(self, predicates=None, functions=None, problem=None):
         self.predicates = set() if predicates is None else set(predicates)
-        self.total_cost = 0
-        self.reward = 0
+        self.total_cost = None
+        self.reward = None
         if functions is not None:
             for fun, val in functions.items():
                 self.set_function_value(fun, val)
@@ -1228,6 +1229,7 @@ class SymbolicState:
         return clone
 
     def has_predicate(self, predicate):
+        if predicate.name == "=": return predicate.arguments[0] == predicate.arguments[1]
         return predicate in self.predicates
 
     def set_function_value(self, function, value):
@@ -1249,6 +1251,14 @@ class SymbolicState:
         for grop in self.problem.ground_operators():
             if grop.is_applicable(self):
                 yield grop
+
+    def to_initial_state(self):
+        functions = {}
+        if self.total_cost is not None:
+            functions[Function("total-cost")] = self.total_cost
+        if self.reward is not None:
+            functions[Function("reward")] = self.reward
+        return InitialState(list(self.predicates), functions)
 
     def __hash__(self):
         if self._hash is None:

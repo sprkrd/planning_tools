@@ -2,12 +2,14 @@ import argparse
 from ..parser import parse_file
 from ..solvers import *
 from ..determinization import *
+from ..simulation import *
 
 
 def main(filepath):
     sdomain, sproblem = parse_file(filepath, "both")
     # determinizer = AllOutcomeDeterminizer()
     determinizer = AlphaCostLikelihoodDeterminizer(round_=2)
+    # determinizer = HindsightDeterminizer("global", 30)
     determinizer.set_domain(sdomain)
     problem = determinizer(sproblem)
     print(problem.domain)
@@ -19,8 +21,8 @@ def main(filepath):
     # print(domain)
     # print(problem)
 
-    # planner = FFPlanner(s=0)
-    planner = FDPlanner(search="astar(add())")
+    planner = FFPlanner(s=0)
+    # planner = FDPlanner(search="astar(add())")
     result = planner(problem, timeout=None)
     print(result["plan-found"])
     if result["plan-found"]:
@@ -28,6 +30,9 @@ def main(filepath):
         print("\n".join("(" + " ".join(t) + ")" for t in result["plan"]))
         print("Total cost: " + str(result["total-cost"]))
         print("Total elapsed: " + str(result["total-elapsed"]))
+        p, base_plan = determinizer.process_plan_trace(result["plan"])
+        print("%success: {}%".format(100*p))
+        print("base plan: " + str(base_plan))
     elif result["timeout"]:
         print("timeout")
     else:
