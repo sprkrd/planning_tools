@@ -25,14 +25,22 @@ class Determinizer:
     def determinize_problem(self, problem):
         raise NotImplementedError()
 
+    def process_action_tuple(self, action_tuple):
+        m = Determinizer.RE_ACTION.match(action_tuple[0])
+        action_base = (m.group(1), *action_tuple[1:])
+        action = self.preprocessed_domain.retrieve_action(*action_base)
+        outcome = int(m.group(2))
+        probability = action.effect[outcome][0]
+        return outcome, probability, action_base
+
     def process_plan_trace(self, plan):
         probability = 1.0
         processed_plan = []
         for a in plan:
             m = Determinizer.RE_ACTION.match(a[0])
-            base_action = self.preprocessed_domain.retrieve_action(m.group(1))
-            probability *= base_action.effect[int(m.group(2))][0]
-            processed_plan.append((base_action.name,*a[1:len(base_action.parameters)+1]))
+            _, p, action = self.process_action_tuple(a)
+            probability *= p
+            processed_plan.append(action)
         return probability, processed_plan
 
     def __call__(self, problem):

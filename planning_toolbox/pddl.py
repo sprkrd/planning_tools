@@ -669,7 +669,7 @@ class AndEffect(Effect):
                 break
         if not found:
             assigneff = AssignmentEffect("increase", Function("total-cost"),
-                    offset)
+                    Constant(offset))
             self.effects.append(assigneff)
         return self
 
@@ -811,6 +811,10 @@ class AssignmentEffect(Effect):
         self.assignop = assignop
         self.lhs = lhs
         self.rhs = rhs
+        if isinstance(rhs, int):
+            import traceback
+            traceback.print_stack()
+            exit()
 
     def apply(self, state, out=None):
         out = out or state.copy()
@@ -1011,6 +1015,9 @@ class Action:
         if not self.effect.is_empty(): ret += "  :effect {}\n".format(self.effect)
         ret += ")"
         return ret
+
+    def __repr__(self):
+        return self.short_str()
 
 
 class Domain:
