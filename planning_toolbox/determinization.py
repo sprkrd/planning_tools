@@ -236,11 +236,6 @@ class HindsightDeterminizer(Determinizer):
         return self._determinize_domain_global(domain)
 
     def _determinize_problem_global(self, problem):
-        problem.remove_mdp_features()
-        if self.transform_rewards:
-            tcfun = Function("total-cost")
-            problem.init.functions[tcfun] = 0
-            problem.goal.metric = ("minimize", tcfun)
         for idx in range(self.wheel_size):
             problem.objects.objects.append(Object("t"+str(idx), "timestep"))
         problem.init.predicates.append(Predicate("current_timestep", "t0"))
@@ -258,11 +253,6 @@ class HindsightDeterminizer(Determinizer):
         return problem
 
     def _determinize_problem_local(self, problem):
-        problem.remove_mdp_features()
-        if self.transform_rewards:
-            tcfun = Function("total-cost")
-            problem.init.functions[tcfun] = 0
-            problem.goal.metric = ("minimize", tcfun)
         for idx in range(self.wheel_size):
             problem.objects.objects.append(Object("s"+str(idx), "status"))
         for a in self.preprocessed_domain.actions:
@@ -282,6 +272,11 @@ class HindsightDeterminizer(Determinizer):
         return problem
 
     def determinize_problem(self, problem):
+        problem.remove_mdp_features()
+        if self.transform_rewards:
+            tcfun = Function("total-cost")
+            problem.init.functions[tcfun] = 0
+            problem.goal.metric = ("minimize", tcfun)
         if self.method == "local":
             return self._determinize_problem_local(problem)
         return self._determinize_problem_global(problem)

@@ -8,7 +8,7 @@ def main(filepath):
     # determinizer = AllOutcomeDeterminizer()
     # determinizer = SingleOutcomeDeterminizer()
     # determinizer = AlphaCostLikelihoodDeterminizer(base=1)
-    determinizer = HindsightDeterminizer("local", 10)
+    determinizer = HindsightDeterminizer("local", 10,True)
     determinizer.set_domain(domain)
     print(determinizer.original_domain, end="\n---\n")
     print(determinizer.preprocessed_domain, end="\n---\n")

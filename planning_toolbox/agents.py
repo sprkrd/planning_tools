@@ -21,7 +21,7 @@ class Agent:
                 step += 1
                 done, timeout, state = simulator.step(action)
                 if verbose:
-                    print(timestamp + "State at step {}".format(step))
+                    print(timestamp + "Executed ({}). State at step {}".format(" ".join(action), step))
                     print(state)
         print(timestamp + "Stopped after {} step(s).".format(step), end=" ")
         if done: print("Success!".format(elapsed))
@@ -39,6 +39,8 @@ class SimpleDeterminizerAgent(Agent):
         self.problem = problem
         self.determinizer = determinizer 
         self.planner = planner
+        self._last_plan = None
+        self._expected_state = None
 
     def _step(self, state):
         self.problem.init = state.to_initial_state()

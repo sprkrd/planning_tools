@@ -8,14 +8,14 @@ from ..agents import *
 
 def main(filepath):
     sdomain, sproblem = parse_file(filepath, "both")
-    determinizer = AllOutcomeDeterminizer()
-    # determinizer = AlphaCostLikelihoodDeterminizer(round_=2)
+    # determinizer = AllOutcomeDeterminizer()
+    determinizer = AlphaCostLikelihoodDeterminizer(round_=2)
     # determinizer = HindsightDeterminizer("global", 30)
     determinizer.set_domain(sdomain)
     print(sdomain)
     print(sproblem)
 
-    planner = FFPlanner(s=0)
+    planner = FFPlanner(s=5)
     simulator = PpddlSimulator(sproblem)
     agent = SimpleDeterminizerAgent(sproblem.copy(), determinizer, planner)
     agent(simulator, verbose=True)
