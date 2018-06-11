@@ -243,6 +243,7 @@ def process_action(tree, domain):
 
 
 def process_domain(tree):
+    print(tree)
     domain = pddl.Domain(tree[1][1].node)
     domain.requirements = [e.node for e in tree[2][1:]]
     for e in tree[3:]:

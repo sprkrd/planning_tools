@@ -8,8 +8,8 @@ from ..simulation import *
 def main(filepath):
     sdomain, sproblem = parse_file(filepath, "both")
     # determinizer = AllOutcomeDeterminizer()
-    # determinizer = AlphaCostLikelihoodDeterminizer(round_=2)
-    determinizer = HindsightDeterminizer("global", 20, False)
+    determinizer = AlphaCostLikelihoodDeterminizer(alpha=1, round_=2)
+    # determinizer = HindsightDeterminizer("global", 20, False)
     determinizer.set_domain(sdomain)
     problem = determinizer(sproblem)
     print(problem.domain)
@@ -21,10 +21,10 @@ def main(filepath):
     # print(domain)
     # print(problem)
 
-    planner = FFPlanner(s=0)
-    # planner = FDPlanner(search="astar(add())")
+    # planner = FFPlanner(s=0)
+    planner = FDPlanner(search="astar(add())")
     result = planner(problem, timeout=None)
-    print(result["plan-found"])
+    print("Plan found!" if result["plan-found"] else "Plan not found")
     if result["plan-found"]:
         print("Plan ({}):".format(len(result["plan"])))
         print("\n".join("(" + " ".join(t) + ")" for t in result["plan"]))

@@ -865,6 +865,7 @@ class AssignmentEffect(Effect):
                 if isinstance(self.rhs, Constant):
                     self.rhs.constant = self.rhs.constant*alpha + inters
                     if round_ > 0: self.rhs.constant = int(round(self.rhs.constant*10**round_))
+                    if self.rhs.constant < 1e-6: return EmptyEffect()
             else: return EmptyEffect()
         return self
 
