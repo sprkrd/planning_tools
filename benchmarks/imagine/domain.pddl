@@ -18,7 +18,7 @@
 (:predicates
              (associated-affordance ?c - removable-component ?a - affordance ?conf - affordance-confidence)
              (broken ?c - component)
-             (connected ?c1 ?c2 - component ?c3 - connector)
+             ;(connected ?c1 ?c2 - component ?c3 - connector)
              (current-mode ?m - mode)
              (current-side ?s - side)
              (current-tool ?t - tool)
@@ -73,63 +73,65 @@
 )
 
 (:action bash
-  :parameters (?c - removable-component ?s - side)
+  :parameters (?comp - removable-component ?side - side)
   :precondition (and
-                  (visible-from-side ?c ?s)
-                  (current-side ?s)
+                  (visible-from-side ?comp ?side)
+                  (current-side ?side)
                   (current-tool hammer)
-                  (forall (?co - component) (not (hides ?co ?c ?s)))
+                  (forall (?comp_ - component) (not (hides ?comp_ ?comp ?side)))
                 )
   :effect (and
-            (loose ?c)
-            (forall (?sc - screw) (not (fixed-by ?c ?sc)))
+            (loose ?comp)
+            (forall (?screw - screw) (not (fixed-by ?comp ?screw)))
             (increase (total-cost) 1)
           )
 )
 
 (:action unscrew
-:parameters (?sc - screw ?s - side)
+:parameters (?screw - screw ?side - side)
 :precondition (and
-                (visible-from-side ?sc ?s)
-                (exists (?sd - screwdriver) (and (current-tool ?sd) (valid-screwdriver ?sc ?sd)))
-                (forall (?c - component) (not (hides ?c ?sc ?s)))
-                (current-side ?s)
+                (visible-from-side ?screw ?side)
+                (exists (?sd - screwdriver) (and (current-tool ?sd) (valid-screwdriver ?screw ?sd)))
+                (forall (?comp - component) (not (hides ?comp ?screw ?side)))
+                (current-side ?side)
               )
 :effect (and
-          (forall (?c - component) (not (fixed-by ?c ?sc)))
-          (removed ?sc)
+          (forall (?comp - component) (not (fixed-by ?comp ?screw)))
+          (removed ?screw)
           (increase (total-cost) 1)
         )
 )
 
-;(:action Flip
-;:parameters (?s0 - side ?s1 - side)
-;:precondition (and (current-side ?s0) (held))
-;:effect (and
-          ;(current-side ?s1)
-          ;(not (current-side ?s0))
-          ;(increase (total-cost) 1)
-        ;)
-;)
+(:action flip
+:parameters (?old-side - side ?new-side - side)
+:precondition (and (current-side ?old-side) (held))
+:effect (and
+          (not (current-side ?old-side))
+          (current-side ?new-side)
+          (increase (total-cost) 1)
+        )
+)
 
-;(:action Lever
-;:parameters (?x - removable ?s - side)
-;:precondition (and
-                ;(held)
-                ;(not (exists (?y - struct) (hides ?y ?x)))
-                ;(not (exists (?y - screw) (fixed-by ?x ?y)))
-                ;(reachable ?x ?s)
-                ;(current-side ?s)
-                ;(current-tool none scara)
-              ;)
-;:effect (and
-          ;(loose ?x)
-          ;(increase (total-cost) 1)
-        ;)
-;)
+(:action lever
+:parameters (?comp - removable-component
+             ?lp - lever-point
+             ?conf - affordance-confidence
+             ?side - side)
+:precondition (and
+                (visible-from-side ?comp ?side)
+                (associated-affordance ?comp ?lp ?conf)
+                (forall (?comp_ - component) (not (hides ?comp_ ?comp ?side)))
+                (forall (?screw - screw) (not (fixed-by ?comp ?screw)))
+                (current-side ?side)
+              )
+:effect (and
+          (loose ?comp)
+          (increase (total-cost) 1)
+        )
+)
 
-;(:action Push_away
-;:parameters (?x - removable ?s - side)
+;(:action push-away
+;:parameters (?)
 ;:precondition (and
                 ;(held)
                 ;;(current-tool none scara)

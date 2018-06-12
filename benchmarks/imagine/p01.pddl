@@ -3,8 +3,10 @@
 (:objects
   cover - removable-surface
   s0 s1 s2 s3 - screw
+  a0 - lever-point
 )
 (:init
+  (associated-affordance cover a0 medium)
   (current-mode no-mode)
   (current-side top)
   (current-tool no-tool)
@@ -26,6 +28,7 @@
   (valid-screwdriver s3 flat-screwdriver)
   (= (total-cost) 0)
 )
-(:goal (forall (?s - screw) (not (fixed-by cover ?s))))
+;(:goal (forall (?s - screw) (not (fixed-by cover ?s))))
+(:goal (loose cover))
 (:metric minimize (total-cost))
 )
