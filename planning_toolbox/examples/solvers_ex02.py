@@ -5,10 +5,12 @@ from ..determinization import *
 from ..simulation import *
 
 
-def main(filepath):
-    sdomain, sproblem = parse_file(filepath, "both")
+def main(domainpath, problempath):
+    sdomain = parse_file(domainpath, "domain")
+    sproblem = parse_file(problempath, "problem", sdomain)
+    # sdomain, sproblem = parse_file(filepath, "both")
     # determinizer = AllOutcomeDeterminizer()
-    determinizer = AlphaCostLikelihoodDeterminizer(alpha=1, round_=2)
+    determinizer = AlphaCostLikelihoodDeterminizer(alpha=0, round_=2)
     # determinizer = HindsightDeterminizer("global", 20, False)
     determinizer.set_domain(sdomain)
     problem = determinizer(sproblem)
@@ -21,7 +23,7 @@ def main(filepath):
     # print(domain)
     # print(problem)
 
-    # planner = FFPlanner(s=0)
+    # planner = FFPlanner(s=5)
     planner = FDPlanner(search="astar(add())")
     result = planner(problem, timeout=None)
     print("Plan found!" if result["plan-found"] else "Plan not found")
@@ -43,9 +45,9 @@ def main(filepath):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument("domainpath", help="Filepath to LISP-like text file")
-    # parser.add_argument("problempath", help="Filepath to LISP-like text file")
-    parser.add_argument("filepath", help="Filepath to LISP-like text file")
+    parser.add_argument("domainpath", help="Filepath to LISP-like text file")
+    parser.add_argument("problempath", help="Filepath to LISP-like text file")
+    # parser.add_argument("filepath", help="Filepath to LISP-like text file")
     args = parser.parse_args()
     main(**vars(args))
 

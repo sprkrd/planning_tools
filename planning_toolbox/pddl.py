@@ -1081,12 +1081,12 @@ class Domain:
 
     def expand_probabilistic_effects(self):
         for a in self.actions:
-            a.effect = a.effect.expand_probabilistic_effects().simplify()
+            a.effect = a.effect.expand_probabilistic_effects()
         return self
 
     def remove_reward_assignments(self):
         for a in self.actions:
-            a.effect = a.effect.remove_reward_assignments().simplify()
+            a.effect = a.effect.remove_reward_assignments()
         return self
 
     def remove_mdp_requirements(self):

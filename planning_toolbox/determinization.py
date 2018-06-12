@@ -19,6 +19,9 @@ class Determinizer:
         self.preprocessed_domain = original_domain.copy().expand_probabilistic_effects()
         self.determinized_domain = self.determinize_domain(self.preprocessed_domain.copy())
 
+    def reset(self):
+        self.set_domain(self.original_domain)
+
     def determinize_domain(self, domain):
         raise NotImplementedError()
 
@@ -62,7 +65,7 @@ class AllOutcomeDeterminizer(Determinizer):
                 if e.is_empty() or p < 1e-6: continue
                 anew = a.copy()
                 anew.name = anew.name + "_o" + str(idx)
-                anew.effect = e
+                anew.effect = e.simplify()
                 actions.append(anew)
         domain.actions = actions
         return domain
@@ -97,7 +100,7 @@ class SingleOutcomeDeterminizer(Determinizer):
                     selected_outcome = (idx, score, e)
             anew = a.copy()
             anew.name = anew.name + "_o" + str(selected_outcome[0])
-            anew.effect = selected_outcome[2]
+            anew.effect = selected_outcome[2].simplify()
             actions.append(anew)
         domain.actions = actions
         return domain
@@ -135,6 +138,7 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
                 if not (isinstance(anew.effect, AssignmentEffect) and
                         anew.effect.lhs.name == "total-cost"):
                     actions.append(anew)
+                anew.effect = anew.effect.simplify()
         domain.actions = actions
         return domain
 
@@ -192,6 +196,7 @@ class HindsightDeterminizer(Determinizer):
                     anew.effect.effects += new_effects
                 else:
                     anew.effect = AndEffect(anew.effect, *new_effects)
+                anew.effect = anew.effect.simplify()
                 actions.append(anew)
         domain.actions = actions
         return domain
@@ -234,6 +239,7 @@ class HindsightDeterminizer(Determinizer):
                         anew.effect.effects += new_effects
                     else:
                         anew.effect = AndEffect(anew.effect, *new_effects)
+                anew.effect = anew.effect.simplify()
                 actions.append(anew)
         domain.actions = actions
         return domain

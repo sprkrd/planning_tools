@@ -6,8 +6,10 @@
   (at ?l - loc)
   (boulder-at ?l - loc)
   (pickaxe-at ?l - loc)
+  (flag-at ?l - loc)
   (alive)
   (has-pickaxe)
+  (goal-reached)
 )
 
 (:action move-to-land
@@ -65,7 +67,7 @@
 )
 
 (:action break-boulder
- :parameters (?l1 ?l2 - loc)
+ :parameters (?l1 ?l2 - land)
  :precondition (and
   (alive)
   (has-pickaxe)
@@ -75,6 +77,17 @@
  :effect (and
   (not (boulder-at ?l2))
   (decrease (reward) 2))
+)
+
+(:action reach-goal
+ :parameters (?l - loc)
+ :precondition (and
+  (not (goal-reached))
+  (alive)
+  (at ?l)
+  (flag-at ?l)
+ )
+ :effect (goal-reached)
 )
 
 )

@@ -42,8 +42,10 @@ object_lists = {
         FLAG: [],
 }
 
+
 def tile_name(idx, jdx):
     return "x_{}_{}".format(idx,jdx)
+
 
 def generate_connected_predicates(nrows, ncols):
     predicates = []
@@ -56,6 +58,15 @@ def generate_connected_predicates(nrows, ncols):
             tile_c1 = tile_name(idx, jdx+1)
             predicates.append(("(connected {} {})".format(tile, tile_c1)))
     return predicates
+
+
+def print_objects(l, type_, line_size=10):
+    for idx, x in enumerate(l):
+        if idx%line_size == 0: print("  ", end="")
+        newline = idx%line_size == line_size-1 and idx != len(l)-1
+        print(x, end="\n" if newline else " ")
+    print(" - " + type_)
+
 
 nrows = 0
 ncols = 0
@@ -77,13 +88,19 @@ with open(mapfile, "r") as f:
                 object_lists[obj].append(name)
 
 
+sys.stdout = open(pname+".pddl", "w")
+
 print("(define (problem {})".format(pname))
 print("(:domain terrain)")
 
 print("(:objects")
-print("  " + " ".join(terrain_lists[LAND]) + " - land")
-print("  " + " ".join(terrain_lists[SHALLOW_SEA]) + " - shallow-water")
-print("  " + " ".join(terrain_lists[DEEP_SEA]) + " - deep-water\n)")
+print_objects(terrain_lists[LAND], "land")
+print_objects(terrain_lists[SHALLOW_SEA], "shallow-water")
+print_objects(terrain_lists[DEEP_SEA], "deep-water")
+print(")")
+# print("  " + " ".join(terrain_lists[LAND]) + " - land")
+# print("  " + " ".join(terrain_lists[SHALLOW_SEA]) + " - shallow-water")
+# print("  " + " ".join(terrain_lists[DEEP_SEA]) + " - deep-water\n)")
 
 init = ["(alive)"]
 init += generate_connected_predicates(nrows, ncols)
@@ -92,10 +109,11 @@ for x in object_lists[BOULDER]:
     init.append("(boulder-at {})".format(x))
 for x in object_lists[PICKAXE]:
     init.append("(pickaxe-at {})".format(x))
+for x in object_lists[FLAG]:
+    init.append("(flag-at {})".format(x))
 init.append("(= (reward) 0)")
 print("(:init\n  " + "\n  ".join(init) + "\n)")
-
-
-# print(terrain_lists)
-# print(object_lists)
+print("(:goal (goal-reached))")
+print("(:metric maximize (reward))")
+print(")")
 
