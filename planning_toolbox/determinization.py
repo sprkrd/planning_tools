@@ -160,7 +160,10 @@ class HindsightDeterminizer(Determinizer):
 
     def _determinize_domain_global(self, domain):
         domain.remove_mdp_requirements()
-        if not self.transform_rewards: domain.remove_reward_assignments()
+        if self.transform_rewards:
+            if "total-cost" not in (f.name for f in domain.functions):
+                domain.functions.append(Function("total-cost"))
+        else: domain.remove_reward_assignments()
         domain.type_hierarchy["timestep"] = None
         domain.predicates.append(Predicate("current_timestep", ("?t", "timestep")))
         domain.predicates.append(Predicate("next_timestep",
@@ -203,7 +206,10 @@ class HindsightDeterminizer(Determinizer):
 
     def _determinize_domain_local(self, domain):
         domain.remove_mdp_requirements()
-        if not self.transform_rewards: domain.remove_reward_assignments()
+        if self.transform_rewards:
+            if "total-cost" not in (f.name for f in domain.functions):
+                domain.functions.append(Function("total-cost"))
+        else: domain.remove_reward_assignments()
         domain.type_hierarchy["status"] = None
         domain.predicates.append(Predicate("next_status",
             ("?sn_1", "status"), ("?sn", "status")))

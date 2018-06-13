@@ -1,12 +1,19 @@
 (define (problem p01)
 (:domain imagine)
 (:objects
-  cover - removable-surface
+  cover - removable-component
   s0 s1 s2 s3 - screw
-  a0 - lever-point
+  cover-a0 - lever-point
+  cover-a1 - suction-point
+  cover-a2 - pliers-point
 )
 (:init
-  (associated-affordance cover a0 medium)
+  (associated-affordance cover cover-a0)
+  (associated-affordance cover cover-a1)
+  (associated-affordance cover cover-a2)
+  (associated-confidence cover-a0 medium)
+  (associated-confidence cover-a1 medium)
+  (associated-confidence cover-a2 medium)
   (current-mode no-mode)
   (current-side top)
   (current-tool no-tool)
@@ -14,13 +21,23 @@
   (fixed-by cover s1)
   (fixed-by cover s2)
   (fixed-by cover s3)
-  (visible-from-side cover top)
-  (visible-from-side s0 top)
-  (visible-from-side s1 top)
-  (visible-from-side s2 top)
-  (visible-from-side s3 top)
+  (opposite-side top bottom)
+  (opposite-side left right)
+  (opposite-side front back)
+  (opposite-side bottom top)
+  (opposite-side right left)
+  (opposite-side back front)
+  (at-side cover top)
+  (at-side s0 top)
+  (at-side s1 top)
+  (at-side s2 top)
+  (at-side s3 top)
   (valid-mode flat-screwdriver scara)
   (valid-mode flat-screwdriver power)
+  (valid-mode suction-tool scara)
+  (valid-mode suction-tool power)
+  (valid-mode cutter scara)
+  (valid-mode pliers power)
   (valid-mode hammer power)
   (valid-screwdriver s0 flat-screwdriver)
   (valid-screwdriver s1 flat-screwdriver)
@@ -29,6 +46,6 @@
   (= (total-cost) 0)
 )
 ;(:goal (forall (?s - screw) (not (fixed-by cover ?s))))
-(:goal (loose cover))
+(:goal (not (at-side cover top)))
 (:metric minimize (total-cost))
 )
