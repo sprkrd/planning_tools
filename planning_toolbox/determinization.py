@@ -34,7 +34,7 @@ class Determinizer:
         action = self.preprocessed_domain.retrieve_action(*action_base)
         outcome = int(m.group(2))
         probability = action.effect[outcome][0]
-        return outcome, probability, action_base
+        return outcome, probability, action.tuple_representation()
 
     def process_plan_trace(self, plan):
         probability = 1.0

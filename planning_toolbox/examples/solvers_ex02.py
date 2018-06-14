@@ -5,12 +5,12 @@ from ..determinization import *
 from ..simulation import *
 
 
-def main(domainpath, problempath):
-    sdomain = parse_file(domainpath, "domain")
-    sproblem = parse_file(problempath, "problem", sdomain)
-    # sdomain, sproblem = parse_file(filepath, "both")
+def main(filepath): #domainpath, problempath):
+    # sdomain = parse_file(domainpath, "domain")
+    # sproblem = parse_file(problempath, "problem", sdomain)
+    sdomain, sproblem = parse_file(filepath, "both")
     # determinizer = AllOutcomeDeterminizer()
-    determinizer = AlphaCostLikelihoodDeterminizer(alpha=6, round_=2)
+    determinizer = AlphaCostLikelihoodDeterminizer(alpha=0, round_=2)
     # determinizer = HindsightDeterminizer("local", 20, False)
     determinizer.set_domain(sdomain)
     problem = determinizer(sproblem)
@@ -46,9 +46,9 @@ def main(domainpath, problempath):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("domainpath", help="Filepath to LISP-like text file")
-    parser.add_argument("problempath", help="Filepath to LISP-like text file")
-    # parser.add_argument("filepath", help="Filepath to LISP-like text file")
+    # parser.add_argument("domainpath", help="Filepath to LISP-like text file")
+    # parser.add_argument("problempath", help="Filepath to LISP-like text file")
+    parser.add_argument("filepath", help="Filepath to LISP-like text file")
     args = parser.parse_args()
     main(**vars(args))
 

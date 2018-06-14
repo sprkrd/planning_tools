@@ -437,7 +437,7 @@ class ExistsQuery(Query):
         self.query = query
 
     def eval(self, state):
-        raise any(self.query.bind(sigma).eval(state)
+        return any(self.query.bind(sigma).eval(state)
                 for sigma in all_possible_assignments(state.problem, self.parameters))
 
     def bind(self, sigma):
@@ -1179,6 +1179,9 @@ class Problem:
     def all_objects_of_type(self, type_=None):
         objects_of_type = []
         for obj in self.objects:
+            inferred = inferred_types(self.domain.type_hierarchy, obj.type)
+            if type_ in inferred: objects_of_type.append(obj.name)
+        for obj in self.domain.constants:
             inferred = inferred_types(self.domain.type_hierarchy, obj.type)
             if type_ in inferred: objects_of_type.append(obj.name)
         return objects_of_type

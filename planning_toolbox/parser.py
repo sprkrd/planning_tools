@@ -296,7 +296,7 @@ def process_problem(tree, domain):
 
 def parse(text, type_="domain", domain=None):
     assert type_ in ("raw", "domain", "problem", "both")
-    text_wo_comments = remove_comments(text)
+    text_wo_comments = remove_comments(text.lower())
     tokens = tokenize(text_wo_comments)
     tokens.reverse()
     if type_ == "raw":

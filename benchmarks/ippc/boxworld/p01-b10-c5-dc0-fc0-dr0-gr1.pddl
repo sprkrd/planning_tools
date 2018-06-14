@@ -62,29 +62,26 @@
           )
  )
  (:action drive-truck
-  :parameters (?t - truck ?src - city ?dst - city)
+  :parameters (?t - truck ?src ?dst ?wrg1 ?wrg2 ?wrg3 - city)
   :effect (when (and (truck-at-city ?t ?src)
                      (can-drive ?src ?dst)
+                     (wrong-drive1 ?src ?wrg1)
+                     (wrong-drive2 ?src ?wrg2)
+                     (wrong-drive3 ?src ?wrg3)
                 )
           (and (not (truck-at-city ?t ?src))
                (probabilistic
-                0.2 (forall (?wrongdst1 - city)
-                    (when (wrong-drive1 ?src ?wrongdst1)
-                    (forall (?wrongdst2 - city)
-                    (when (wrong-drive2 ?src ?wrongdst2)
-                    (forall (?wrongdst3 - city)
-                    (when (wrong-drive3 ?src ?wrongdst3)
-                     (probabilistic
-                      1/3 (truck-at-city ?t ?wrongdst1)
-                      1/3 (truck-at-city ?t ?wrongdst2)
-                      1/3 (truck-at-city ?t ?wrongdst3)
-                     )
-                    ))))))
+                0.2 (probabilistic
+                      1/3 (truck-at-city ?t ?wrg1)
+                      1/3 (truck-at-city ?t ?wrg2)
+                      1/3 (truck-at-city ?t ?wrg3)
+                    )
                 0.8 (truck-at-city ?t ?dst)
                )
           )
           )
  )
+
  (:action fly-plane
   :parameters (?p - plane ?src - city ?dst - city)
   :effect (when (and (plane-at-city ?p ?src)
@@ -96,6 +93,7 @@
  )
  )
 )
+
 (define
  (problem box-p01)
   (:domain boxworld)
