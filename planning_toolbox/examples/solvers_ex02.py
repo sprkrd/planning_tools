@@ -10,8 +10,8 @@ def main(domainpath, problempath):
     sproblem = parse_file(problempath, "problem", sdomain)
     # sdomain, sproblem = parse_file(filepath, "both")
     # determinizer = AllOutcomeDeterminizer()
-    determinizer = AlphaCostLikelihoodDeterminizer(alpha=0, round_=2)
-    # determinizer = HindsightDeterminizer("global", 20, False)
+    determinizer = AlphaCostLikelihoodDeterminizer(alpha=6, round_=2)
+    # determinizer = HindsightDeterminizer("local", 20, False)
     determinizer.set_domain(sdomain)
     problem = determinizer(sproblem)
     print(problem.domain)
@@ -23,8 +23,9 @@ def main(domainpath, problempath):
     # print(domain)
     # print(problem)
 
-    # planner = FFPlanner(s=5)
-    planner = FDPlanner(search="astar(add())")
+    # planner = FFPlanner(s=0)
+    planner = FDPlanner(search="astar(ff())")
+    # planner = FDPlanner(search="astar(hmax())")
     result = planner(problem, timeout=None)
     print("Plan found!" if result["plan-found"] else "Plan not found")
     if result["plan-found"]:

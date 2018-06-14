@@ -22,14 +22,12 @@
  (:requirements :typing :equality :disjunctive-preconditions
                 :probabilistic-effects :existential-preconditions
                 :conditional-effects :negative-preconditions
-                :universal-preconditions :rewards :equality)
+                :universal-preconditions :rewards
+		:equality)
  (:types comp)
 
- (:predicates (up-verified ?c - comp)
-              (up-not-verified ?c - comp)
-              (reboot-started ?c - comp)
-              (reboot-pending ?c - comp)
-              (conn ?c ?d - comp))
+ (:predicates (up ?c)
+              (conn ?c ?d))
 
 ;; Note: MDPSim performs an action by going down its effect tree,
 ;; storing adds and dels (of terms) and updates (of values). The
@@ -38,7 +36,7 @@
 ;; All tests are based on old terms and values (which is good). Terms
 ;; and values are updated only after the "action tree" has been
 ;; processed. As a result, no chain reaction can take place.
-(:action start-reboot
+(:action reboot
   :parameters (?x - comp)
   :effect (and
             (forall (?d - comp) (when (up ?d) (increase (reward) 1)))
@@ -48,18 +46,12 @@
                       (probabilistic
                         0.2 (when
                               (exists (?c - comp)
-                                      (and
-                                        (conn ?c ?d)
-                                        (not (up ?c))
-                                        (not (= ?d ?x))))
+                              (and
+                                (conn ?c ?d)
+                                (not (up ?c))
+                                (not (= ?d ?x))))
                               (not (up ?d))))
                       (probabilistic
                         0.05 (when (not (= ?d ?x))
                                (not (up ?d)))))))
-)
-
-(:action reboot-step
-  :parameters (?c1 ?c2 - comp)
-)
-
-)
+))

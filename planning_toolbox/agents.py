@@ -3,6 +3,7 @@ from .determinization import AllOutcomeDeterminizer
 class Agent:
  
     def __call__(self, simulator, verbose=False):
+        self._reset()
         simulator.reset()
         simulator.start()
         timeout = False
@@ -31,6 +32,9 @@ class Agent:
         elif not found: print("Plan not found!")
         return timeout, done, simulator.elapsed(), step, state
 
+    def _reset(self):
+        raise NotImplementedError()
+
     def _step(self, state, remaining):
         raise NotImplementedError()
 
@@ -41,34 +45,47 @@ class SimpleDeterminizerAgent(Agent):
         self.problem = problem
         self.determinizer = determinizer 
         self.planner = planner
-        self._last_plan = None
-        self._expected_state = None
+        self._partial_policy = None
+        # self._last_plan = None
+        # self._expected_state = None
 
     def _step(self, state, remaining):
-        self.problem.init = state.to_initial_state()
-        dproblem = self.determinizer(self.problem)
-        if not (self._expected_state and self._expected_state == state):
+        if state not in self._partial_policy:
+            dproblem = self.determinizer(self.problem)
+            self.problem.init = state.to_initial_state()
             result = self.planner(dproblem, timeout=remaining)
             if result["plan-found"]:
-                self._last_plan = result["plan"]
-                self._last_plan.reverse()
+                next_state = dproblem.get_initial_state()
+                for action in result["plan"]:
+                    action_outcome = dproblem.domain.retrieve_action(*action)
+                    _, _, base = self.determinizer.process_action_tuple(action)
+                    self._partial_policy[next_state] = base
+                    next_state = action_outcome.apply(next_state)
             else:
-                self._last_plan = None
-                self._expected_state = None
-        base_action = None
-        if self._last_plan:
-            next_action = self._last_plan.pop()
-            _, _, base_action = self.determinizer.process_action_tuple(next_action)
-            action_outcome = dproblem.domain.retrieve_action(*next_action)
-            self._expected_state = action_outcome.apply(dproblem.get_initial_state())
+                print(self.determinizer.determinized_domain)
+                print(result["stdout"])
+                print(result["stderr"])
+        base_action = self._partial_policy.get(state)
+        # if not (self._expected_state and self._expected_state == state):
+            # dproblem = self.determinizer(self.problem)
+            # self.problem.init = state.to_initial_state()
+            # result = self.planner(dproblem, timeout=remaining)
+            # if result["plan-found"]:
+                # self._last_plan = result["plan"]
+                # self._last_plan.reverse()
+            # else:
+                # self._last_plan = None
+                # self._expected_state = None
+        # base_action = None
+        # if self._last_plan:
+            # next_action = self._last_plan.pop()
+            # _, _, base_action = self.determinizer.process_action_tuple(next_action)
+            # action_outcome = dproblem.domain.retrieve_action(*next_action)
+            # self._expected_state = action_outcome.apply(dproblem.get_initial_state())
         return base_action
-        # if result["plan-found"]:
-            # _, _, base_action = self.determinizer.process_action_tuple(result["plan"][0])
-            # return base_action
-        # else:
-            # print(result["stderr"])
-            # print(result["stdout"])
-            # return None
+
+    def _reset(self):
+        self._partial_policy = {}
 
 
 class HindsightAgent(Agent):
@@ -101,11 +118,14 @@ class HindsightAgent(Agent):
                 except KeyError:
                     pha[base_action] = [result["plan"]]
             remaining -= result["time-wall"]
-            print(idx)
+            # print(idx)
         scored_pha = sorted([(len(plan), a) for a,plan in pha.items()], reverse=True)[:self.max_pha]
         print(scored_pha)
         return pha
 
     def _step(self, state, remaining):
+        pass
+
+    def _reset(self):
         pass
 

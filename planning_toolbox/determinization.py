@@ -135,10 +135,10 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
                 if offset > 1e-6: anew.effect = anew.effect.add_cost_offset(offset)
                 # don't consider actions that only increase the total cost
                 # and don't modify the state in any other way
+                anew.effect = anew.effect.simplify()
                 if not (isinstance(anew.effect, AssignmentEffect) and
                         anew.effect.lhs.name == "total-cost"):
                     actions.append(anew)
-                anew.effect = anew.effect.simplify()
         domain.actions = actions
         return domain
 

@@ -712,7 +712,7 @@ class ForallEffect(Effect):
        return out
 
     def bind(self, sigma):
-        return TotalEffect(self.parameters.bind(sigma), self.effect.bind(sigma))
+        return ForallEffect(self.parameters.bind(sigma), self.effect.bind(sigma))
 
     def count_additive_effects(self):
         return self.effect.count_additive_effects()
