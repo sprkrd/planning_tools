@@ -75,6 +75,9 @@ class ObjectList:
     def __hash__(self):
         return hash(tuple(self.objects))
 
+    def __repr__(self):
+        return str(self)
+
     def __str__(self):
         ret = ""
         first = True
@@ -120,6 +123,9 @@ class Functional:
 
     def __hash__(self):
         return hash((self.name,*self.arguments))
+
+    def __repr__(self):
+        return str(self)
 
     def __str__(self):
         if self.arguments:
@@ -443,7 +449,7 @@ class ExistsQuery(Query):
     def bind(self, sigma):
         return ExistsQuery(self.parameters.bind(sigma), self.query.bind(sigma))
 
-    def is_emtpy(self):
+    def is_empty(self):
         return self.query.is_empty()
 
     def simplify(self):
@@ -891,7 +897,7 @@ class ProbabilisticEffect(Effect):
         acc = 0
         for p, e in self:
             acc += p
-            if r < p:
+            if r < acc:
                 out = e.apply(state, out)
                 break
         return out

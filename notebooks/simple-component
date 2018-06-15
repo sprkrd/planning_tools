@@ -1,0 +1,8 @@
+digraph {
+	node [shape=box]
+	magnet [label=<<b>magnet</b><br/><i>removable-component</i>> fillcolor="#cccccc" style=filled]
+	cover [label=<<b>cover</b><br/><i>at-side(top)</i><br/><i>removable-component</i>>]
+	"cover-s0" [label=<<b>cover-s0</b><br/><i>screw</i>>]
+	cover -> "cover-s0" [label=<<i>fixed-by</i>>]
+	cover -> magnet [label=<<i>hides-component</i><br/><i>something-else</i>> style=dashed]
+}

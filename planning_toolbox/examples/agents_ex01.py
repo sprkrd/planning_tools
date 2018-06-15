@@ -9,18 +9,18 @@ from ..agents import *
 def main(filepath):
     sdomain, sproblem = parse_file(filepath, "both")
     # determinizer = AllOutcomeDeterminizer()
-    # determinizer = AlphaCostLikelihoodDeterminizer(base=0, round_=2)
-    determinizer = HindsightDeterminizer("local", 30)
+    determinizer = AlphaCostLikelihoodDeterminizer(base=100, round_=2)
+    # determinizer = HindsightDeterminizer("local", 30)
     determinizer.set_domain(sdomain)
     print(sdomain)
     print(sproblem)
 
-    # planner = FFPlanner(s=0)
-    planner = FDPlanner(search="astar(add())")
+    # planner = FFPlanner(s=5)
+    planner = FDPlanner(search="astar(cea())")
     simulator = PpddlSimulator(sproblem)
-    # agent = SimpleDeterminizerAgent(sproblem.copy(), determinizer, planner)
-    agent = HindsightAgent(sproblem.copy(), determinizer, planner,
-                calls_per_pha=5, initial_calls=5)
+    agent = SimpleDeterminizerAgent(sproblem.copy(), determinizer, planner)
+    # agent = HindsightAgent(sproblem.copy(), determinizer, planner,
+                # calls_per_pha=10, initial_calls=10)
     # agent._pha(sproblem.get_initial_state(), 300)
     agent(simulator, verbose=True)
     print(agent.invokations)
