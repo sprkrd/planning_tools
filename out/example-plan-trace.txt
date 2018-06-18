@@ -37,6 +37,7 @@ Same action repeated too many times! Changing priority...
 [1.213s] Stopped after 32 step(s). Success!
 
 With partially occluded!
+Starting...
 [0.205s] Executed (pick-tool flat-sd power)
 [0.206s] Executed (unscrew-power-non-stuck lid-s0 flat-sd top)
 [0.410s] Executed (unscrew-power-stuck lid-s0 flat-sd top)

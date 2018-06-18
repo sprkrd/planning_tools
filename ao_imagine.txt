@@ -1,0 +1,568 @@
+(define (domain imagine)
+
+(:requirements :adl)
+
+(:types suction-point lever-point pliers-point - affordance
+screw - removable-component
+screwdriver - tool
+removable-component - component
+affordance component mode tool side affordance-confidence - object)
+
+(:constants top bottom front back left right - side low medium high - affordance-confidence scara power no-mode - mode flat-sd star-sd - screwdriver hammer suction-tool pliers cutter no-tool - tool)
+
+(:predicates
+  (has-affordance ?c - removable-component ?a - affordance)
+  (has-confidence ?a - affordance ?c - affordance-confidence)
+  (broken-component ?c - removable-component)
+  (broken-tool ?t - tool)
+  (connected ?c1 ?c2 - component)
+  (clear ?c - removable-component)
+  (current-mode ?m - mode)
+  (current-side ?s - side)
+  (current-tool ?t - tool)
+  (held)
+  (hides-component ?c1 ?c2 - component)
+  (hides-affordance ?c1 - component ?a - affordance)
+  (fixed-by ?c - removable-component ?s - screw)
+  (loose ?c - removable-component)
+  (partially-occludes ?c1 ?c2 - component)
+  (removed-non-verified ?c - removable-component)
+  (removed-verified ?c - removable-component)
+  (stuck ?s - screw)
+  (opposite-side ?s1 ?s2 - side)
+  (at-side ?c - component ?s - side)
+  (valid-mode ?t - tool ?m - mode)
+  (valid-sd ?s - screw ?sd - screwdriver)
+)
+
+(:action check-removed_o0
+  :parameters (?comp - removable-component ?side - side)
+  :precondition (and (current-side ?side) (at-side ?comp ?side) (removed-non-verified ?comp))
+  :effect (and (forall (?other - component) (and (not (hides-component ?comp ?other)) (not (partially-occludes ?comp ?other)))) (forall (?aff - affordance) (not (hides-affordance ?comp ?aff))) (not (at-side ?comp ?side)) (not (removed-non-verified ?comp)) (removed-verified ?comp))
+)
+
+(:action assert-clear_o0
+  :parameters (?comp - removable-component)
+  :precondition (and (not (clear ?comp)) (forall (?screw - screw) (not (fixed-by ?comp ?screw))) (forall (?other - component) (and (not (connected ?comp ?other)) (not (connected ?other ?comp)))))
+  :effect (clear ?comp)
+)
+
+(:action pick-tool_o0
+  :parameters (?tool - tool ?mode - mode)
+  :precondition (and (not (= ?tool no-tool)) (not (= ?mode no-mode)) (imply (held) (not (= ?mode power))) (current-tool no-tool) (current-mode no-mode) (valid-mode ?tool ?mode))
+  :effect (and (not (current-tool no-tool)) (not (current-mode no-mode)) (current-tool ?tool) (current-mode ?mode))
+)
+
+(:action put-away-tool_o0
+  :parameters (?tool - tool ?mode - mode)
+  :precondition (and (not (= ?tool no-tool)) (not (= ?mode no-mode)) (current-tool ?tool) (current-mode ?mode))
+  :effect (and (not (current-tool ?tool)) (not (current-mode ?mode)) (current-tool no-tool) (current-mode no-mode))
+)
+
+(:action grab-device_o0
+  :precondition (and (not (held)) (not (current-mode power)))
+  :effect (held)
+)
+
+(:action place-device_o0
+  :precondition (held)
+  :effect (not (held))
+)
+
+(:action flip_o0
+  :parameters (?old-side ?new-side - side)
+  :precondition (and (current-side ?old-side) (held))
+  :effect (and (not (current-side ?old-side)) (current-side ?new-side))
+)
+
+(:action let-fall-down_o0
+  :parameters (?comp - removable-component ?side ?side-opposite - side)
+  :precondition (and (held) (at-side ?comp ?side) (opposite-side ?side ?side-opposite) (current-side ?side-opposite) (loose ?comp) (clear ?comp) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (forall (?comp_ - component) (not (partially-occludes ?comp_ ?comp))))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action cut-connector_o0
+  :parameters (?c1 ?c2 - component ?side - side)
+  :precondition (and (current-tool cutter) (imply (not (held)) (current-mode power)) (connected ?c1 ?c2) (current-side ?side) (or (at-side ?c1 ?side) (at-side ?c2 ?side)))
+  :effect (and (not (connected ?c1 ?c2)) (not (connected ?c2 ?c1)))
+)
+
+(:action unscrew-scara-non-stuck_o0
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (not (stuck ?screw)) (current-mode scara) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (and (forall (?comp - removable-component) (not (fixed-by ?comp ?screw))) (not (at-side ?screw ?side)) (removed-verified ?screw))
+)
+
+(:action unscrew-scara-non-stuck_o1
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (not (stuck ?screw)) (current-mode scara) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (stuck ?screw)
+)
+
+(:action unscrew-scara-stuck_o0
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (stuck ?screw) (current-mode scara) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (and (forall (?comp - removable-component) (not (fixed-by ?comp ?screw))) (not (at-side ?screw ?side)) (removed-verified ?screw))
+)
+
+(:action unscrew-power-non-stuck_o0
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (not (stuck ?screw)) (current-mode power) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (and (forall (?comp - removable-component) (not (fixed-by ?comp ?screw))) (not (at-side ?screw ?side)) (removed-verified ?screw))
+)
+
+(:action unscrew-power-non-stuck_o1
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (not (stuck ?screw)) (current-mode power) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (stuck ?screw)
+)
+
+(:action unscrew-power-stuck_o0
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (stuck ?screw) (current-mode power) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (and (forall (?comp - removable-component) (not (fixed-by ?comp ?screw))) (not (at-side ?screw ?side)) (removed-verified ?screw) (broken-tool ?sd))
+)
+
+(:action unscrew-power-stuck_o1
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (stuck ?screw) (current-mode power) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (and (forall (?comp - removable-component) (not (fixed-by ?comp ?screw))) (not (at-side ?screw ?side)) (removed-verified ?screw))
+)
+
+(:action unscrew-power-stuck_o2
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (stuck ?screw) (current-mode power) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (and (broken-component ?screw) (broken-tool ?sd))
+)
+
+(:action unscrew-power-stuck_o3
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (stuck ?screw) (current-mode power) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (broken-component ?screw)
+)
+
+(:action unscrew-power-stuck_o4
+  :parameters (?screw - screw ?sd - screwdriver ?side - side)
+  :precondition (and (not (broken-component ?screw)) (not (broken-tool ?sd)) (stuck ?screw) (current-mode power) (current-side ?side) (at-side ?screw ?side) (current-tool ?sd) (valid-sd ?screw ?sd) (forall (?comp - component) (not (hides-component ?comp ?screw))))
+  :effect (broken-tool ?sd)
+)
+
+(:action bash_o0
+  :parameters (?comp - removable-component ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool hammer)) (at-side ?comp ?side) (current-side ?side) (current-tool hammer) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (forall (?comp_ - component) (not (partially-occludes ?comp_ ?comp))))
+  :effect (and (forall (?screw - screw) (not (fixed-by ?comp ?screw))) (forall (?screw - screw ?side_ - side) (not (at-side ?screw ?side_))) (loose ?comp) (broken-tool hammer))
+)
+
+(:action bash_o1
+  :parameters (?comp - removable-component ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool hammer)) (at-side ?comp ?side) (current-side ?side) (current-tool hammer) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (forall (?comp_ - component) (not (partially-occludes ?comp_ ?comp))))
+  :effect (and (forall (?screw - screw) (not (fixed-by ?comp ?screw))) (forall (?screw - screw ?side_ - side) (not (at-side ?screw ?side_))) (loose ?comp))
+)
+
+(:action bash_o2
+  :parameters (?comp - removable-component ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool hammer)) (at-side ?comp ?side) (current-side ?side) (current-tool hammer) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (forall (?comp_ - component) (not (partially-occludes ?comp_ ?comp))))
+  :effect (and (forall (?screw - screw) (not (fixed-by ?comp ?screw))) (forall (?screw - screw ?side_ - side) (not (at-side ?screw ?side_))) (broken-tool hammer))
+)
+
+(:action bash_o3
+  :parameters (?comp - removable-component ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool hammer)) (at-side ?comp ?side) (current-side ?side) (current-tool hammer) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (forall (?comp_ - component) (not (partially-occludes ?comp_ ?comp))))
+  :effect (and (forall (?screw - screw) (not (fixed-by ?comp ?screw))) (forall (?screw - screw ?side_ - side) (not (at-side ?screw ?side_))))
+)
+
+(:action bash_o4
+  :parameters (?comp - removable-component ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool hammer)) (at-side ?comp ?side) (current-side ?side) (current-tool hammer) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (forall (?comp_ - component) (not (partially-occludes ?comp_ ?comp))))
+  :effect (and (broken-component ?comp) (broken-tool hammer))
+)
+
+(:action bash_o5
+  :parameters (?comp - removable-component ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool hammer)) (at-side ?comp ?side) (current-side ?side) (current-tool hammer) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (forall (?comp_ - component) (not (partially-occludes ?comp_ ?comp))))
+  :effect (broken-component ?comp)
+)
+
+(:action bash_o6
+  :parameters (?comp - removable-component ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool hammer)) (at-side ?comp ?side) (current-side ?side) (current-tool hammer) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (forall (?comp_ - component) (not (partially-occludes ?comp_ ?comp))))
+  :effect (broken-tool hammer)
+)
+
+(:action lever-scara-low-confidence_o0
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)) (broken-tool flat-sd))
+)
+
+(:action lever-scara-low-confidence_o1
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)))
+)
+
+(:action lever-scara-low-confidence_o2
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-scara-low-confidence_o3
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action lever-scara-low-confidence_o4
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-scara-low-confidence_o5
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+)
+
+(:action lever-scara-low-confidence_o6
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool flat-sd)
+)
+
+(:action lever-scara-medium-confidence_o0
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)) (broken-tool flat-sd))
+)
+
+(:action lever-scara-medium-confidence_o1
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)))
+)
+
+(:action lever-scara-medium-confidence_o2
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-scara-medium-confidence_o3
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action lever-scara-medium-confidence_o4
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-scara-medium-confidence_o5
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+)
+
+(:action lever-scara-medium-confidence_o6
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool flat-sd)
+)
+
+(:action lever-scara-high-confidence_o0
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)) (broken-tool flat-sd))
+)
+
+(:action lever-scara-high-confidence_o1
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)))
+)
+
+(:action lever-scara-high-confidence_o2
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-scara-high-confidence_o3
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action lever-scara-high-confidence_o4
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-scara-high-confidence_o5
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+)
+
+(:action lever-scara-high-confidence_o6
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode scara) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool flat-sd)
+)
+
+(:action lever-power-low-confidence_o0
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)) (broken-tool flat-sd))
+)
+
+(:action lever-power-low-confidence_o1
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)))
+)
+
+(:action lever-power-low-confidence_o2
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-power-low-confidence_o3
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action lever-power-low-confidence_o4
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-power-low-confidence_o5
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+)
+
+(:action lever-power-low-confidence_o6
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp low) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool flat-sd)
+)
+
+(:action lever-power-medium-confidence_o0
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)) (broken-tool flat-sd))
+)
+
+(:action lever-power-medium-confidence_o1
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)))
+)
+
+(:action lever-power-medium-confidence_o2
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-power-medium-confidence_o3
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action lever-power-medium-confidence_o4
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-power-medium-confidence_o5
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+)
+
+(:action lever-power-medium-confidence_o6
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp medium) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool flat-sd)
+)
+
+(:action lever-power-high-confidence_o0
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)) (broken-tool flat-sd))
+)
+
+(:action lever-power-high-confidence_o1
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (loose ?comp) (when (loose ?comp) (removed-non-verified ?comp)))
+)
+
+(:action lever-power-high-confidence_o2
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-power-high-confidence_o3
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action lever-power-high-confidence_o4
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool flat-sd))
+)
+
+(:action lever-power-high-confidence_o5
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+)
+
+(:action lever-power-high-confidence_o6
+  :parameters (?comp - removable-component ?lp - lever-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool flat-sd)) (at-side ?comp ?side) (has-affordance ?comp ?lp) (has-confidence ?lp high) (current-side ?side) (current-tool flat-sd) (current-mode power) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?lp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool flat-sd)
+)
+
+(:action suck-away-low-confidence_o0
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp low) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool suction-tool))
+)
+
+(:action suck-away-low-confidence_o1
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp low) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action suck-away-low-confidence_o2
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp low) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool suction-tool)
+)
+
+(:action suck-away-medium-confidence_o0
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp medium) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool suction-tool))
+)
+
+(:action suck-away-medium-confidence_o1
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp medium) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action suck-away-medium-confidence_o2
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp medium) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool suction-tool)
+)
+
+(:action suck-away-high-confidence_o0
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp high) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool suction-tool))
+)
+
+(:action suck-away-high-confidence_o1
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp high) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action suck-away-high-confidence_o2
+  :parameters (?comp - removable-component ?sp - suction-point ?side - side)
+  :precondition (and (not (broken-component ?comp)) (not (broken-tool suction-tool)) (at-side ?comp ?side) (has-affordance ?comp ?sp) (has-confidence ?sp high) (current-side ?side) (current-tool suction-tool) (imply (not (held)) (current-mode power)) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?sp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-tool suction-tool)
+)
+
+(:action extract-with-pliers-low-confidence_o0
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp low) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool pliers))
+)
+
+(:action extract-with-pliers-low-confidence_o1
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp low) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action extract-with-pliers-low-confidence_o2
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp low) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool pliers))
+)
+
+(:action extract-with-pliers-low-confidence_o3
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp low) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+)
+
+(:action extract-with-pliers-medium-confidence_o0
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp medium) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool pliers))
+)
+
+(:action extract-with-pliers-medium-confidence_o1
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp medium) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action extract-with-pliers-medium-confidence_o2
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp medium) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool pliers))
+)
+
+(:action extract-with-pliers-medium-confidence_o3
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp medium) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+)
+
+(:action extract-with-pliers-high-confidence_o0
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp high) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (removed-non-verified ?comp) (broken-tool pliers))
+)
+
+(:action extract-with-pliers-high-confidence_o1
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp high) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (removed-non-verified ?comp)
+)
+
+(:action extract-with-pliers-high-confidence_o2
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp high) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (and (broken-component ?comp) (broken-tool pliers))
+)
+
+(:action extract-with-pliers-high-confidence_o3
+  :parameters (?comp - removable-component ?pp - pliers-point ?side - side)
+  :precondition (and (not (broken-tool pliers)) (not (broken-component ?comp)) (at-side ?comp ?side) (has-affordance ?comp ?pp) (has-confidence ?pp high) (current-side ?side) (current-tool pliers) (forall (?comp_ - component) (not (hides-affordance ?comp_ ?pp))) (forall (?comp_ - component) (not (hides-component ?comp_ ?comp))) (clear ?comp))
+  :effect (broken-component ?comp)
+))

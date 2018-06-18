@@ -17,7 +17,7 @@ def main(serverdomain, clientdomain, serverproblem):
     determinizer.set_domain(client_domain)
 
     # planner = FFPlanner(s=0)
-    planner = FDPlanner(search="astar(cea())")
+    planner = FDPlanner(search="astar(hmax())")
     simulator = ImagineSimulator(PpddlSimulator(server_problem, timeout=180))
     agent = ImagineAgent(SimpleDeterminizerAgent(
         Problem(server_problem.name, client_domain), determinizer, planner))
