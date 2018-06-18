@@ -897,6 +897,7 @@ class ProbabilisticEffect(Effect):
         acc = 0
         for p, e in self:
             acc += p
+            # print("p: {}, e: {}, acc: {}, r: {}".format(p,e,acc,r))
             if r < acc:
                 out = e.apply(state, out)
                 break

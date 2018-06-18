@@ -1,0 +1,18 @@
+digraph {
+	graph [rankdir=LR]
+	node [shape=box]
+	"reader-a1" [label=<<b>reader-a1</b><br/><i>has-confidence(high)</i><br/><i>pliers-point</i>>]
+	platter [label=<<b>platter</b><br/><i>at-side(top)</i><br/><i>loose</i><br/><i>removable-component</i>>]
+	"platter-a0" [label=<<b>platter-a0</b><br/><i>has-confidence(low)</i><br/><i>suction-point</i>>]
+	"reader-a0" [label=<<b>reader-a0</b><br/><i>has-confidence(low)</i><br/><i>lever-point</i>>]
+	reader [label=<<b>reader</b><br/><i>at-side(top)</i><br/><i>removable-component</i>>]
+	"platter-a1" [label=<<b>platter-a1</b><br/><i>has-confidence(high)</i><br/><i>suction-point</i>> fillcolor="#cccccc" style=filled]
+	"reader-s0" [label=<<b>reader-s0</b><br/><i>at-side(bottom)</i><br/><i>screw</i><br/><i>valid-sd(star-sd)</i>>]
+	reader -> "reader-a1" [label=<<i>has-affordance</i>>]
+	reader -> "platter-a1" [label=<<i>hides-affordance</i>> style=dashed]
+	reader -> "reader-s0" [label=<<i>fixed-by</i>>]
+	reader -> platter [label=<<i>partially-occludes</i>>]
+	reader -> "reader-a0" [label=<<i>has-affordance</i>>]
+	platter -> "platter-a1" [label=<<i>has-affordance</i>> style=dashed]
+	platter -> "platter-a0" [label=<<i>has-affordance</i>>]
+}

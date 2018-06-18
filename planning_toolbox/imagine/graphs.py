@@ -49,6 +49,7 @@ class Graph:
         self._V = {}
         self._E = {}
         self._hidden = set()
+        self._occluded = set()
         for arg in args:
             if len(arg) == 2:
                 try:
@@ -58,6 +59,8 @@ class Graph:
             else: # assume len(arg) = 3
                 if arg[2] in ("hides-component", "hides-affordance"):
                     self._hidden.add(arg[1])
+                elif arg[2] == "partially-occludes":
+                    self._occluded.add(arg[1])
                 try:
                     self.E[arg[0]].append(arg[1:])
                 except KeyError:
@@ -75,6 +78,10 @@ class Graph:
     def hidden(self):
         return self._hidden
 
+    @property
+    def occluded(self):
+        return self._occluded
+
     def features(self, ommit_hidden=False):
         for vertex, labels in self.V.items():
             if not ommit_hidden or vertex not in self.hidden:
@@ -85,6 +92,19 @@ class Graph:
                 for to, label in out:
                     if not ommit_hidden or to not in self.hidden:
                         yield (from_, to, label)
+
+    def ommit_occluded(self):
+        features = []
+        for vertex, labels in self.V.items():
+            if vertex not in self.occluded:
+                for label in labels:
+                    features.append((vertex, label))
+        for from_, out in self.E.items():
+            if from_ not in self.occluded:
+                for to, label in out:
+                    if to not in self.occluded:
+                        features.append((from_, to, label))
+        return Graph(*features)
 
     def subgraph(self, focus, exclude_links=None, max_depth=1):
         exclude_links = exclude_links or []
@@ -113,7 +133,7 @@ class Graph:
             gv_graph.edge(str(from_), str(to),
                     "<"+nice_html_list(labels)+">", style=style)
         gv_graph.node_attr["shape"] = "box"
-        gv_graph.graph_attr["rankdir"] = "UL"
+        gv_graph.graph_attr["rankdir"] = "LR"
         return gv_graph
 
     def to_pdf(self, filename):

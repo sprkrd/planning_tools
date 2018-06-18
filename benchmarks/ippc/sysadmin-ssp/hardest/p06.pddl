@@ -28,7 +28,7 @@
 	 (conn comp15 comp8)
   )
   (:goal (forall (?c - comp)
-                 (up ?c)))
+                 (up-verified ?c)))
   (:goal-reward 500)
  (:metric maximize (reward))
 )

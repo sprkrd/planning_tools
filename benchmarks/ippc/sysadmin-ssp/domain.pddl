@@ -76,7 +76,7 @@
  :parameters (?x - comp)
  :precondition (and
                  (reboot-started ?x)
-                 (reboot-pending ?d)
+                 (reboot-pending ?x)
                  (up-verified ?x)
                )
  :effect (and

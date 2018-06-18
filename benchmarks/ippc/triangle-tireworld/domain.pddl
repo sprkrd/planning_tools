@@ -8,14 +8,14 @@
   (:action move-car
     :parameters (?from - location ?to - location)
     :precondition (and (vehicle-at ?from) (road ?from ?to) (not-flattire))
-    :effect (and (vehicle-at ?to) (not (vehicle-at ?from))
+    :effect (and (decrease (reward) 1) (vehicle-at ?to) (not (vehicle-at ?from))
 		 (probabilistic 0.5 (not (not-flattire)))))
   (:action loadtire
     :parameters (?loc - location)
     :precondition (and (vehicle-at ?loc) (spare-in ?loc))
-    :effect (and (hasspare) (not (spare-in ?loc))))
+    :effect (and (decrease (reward) 1) (hasspare) (not (spare-in ?loc))))
   (:action changetire
     :precondition (hasspare)
-    :effect (and (not (hasspare)) (not-flattire)))
+    :effect (and (decrease (reward) 1) (not (hasspare)) (not-flattire)))
 
 )

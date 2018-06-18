@@ -1,6 +1,9 @@
 import re
+import os
 
 from matplotlib import pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
+
 
 PROBLEM_FILE_RE = re.compile(r"p[0-9]+\.pddl")
 
@@ -9,7 +12,7 @@ def linspace(a, b, n):
         yield a + i*(b-a)/(n-1)
         
         
-def plot_results_actl(alphas, plan_prob, plan_len, plan_cost):
+def plot_results_actl(alphas, plan_prob, plan_len, plan_cost, save=None):
     fig, axs = plt.subplots(2, 1, sharex=True)
     fig.subplots_adjust(hspace=0.05)
     # fst plot
@@ -33,6 +36,10 @@ def plot_results_actl(alphas, plan_prob, plan_len, plan_cost):
     max_y = min(1.0, max(plan_prob)*1.1)
     axs[1].set_yticks(list(linspace(min_y, max_y, 6)))
     axs[1].grid("on")
+    axs[1].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+    if save:
+        plt.savefig(save)
+        os.system("pdfcrop "+save)
     plt.show()
     
 def print_plan(title, plan):

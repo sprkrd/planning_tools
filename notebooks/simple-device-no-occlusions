@@ -1,0 +1,11 @@
+digraph {
+	graph [rankdir=LR]
+	node [shape=box]
+	"reader-a1" [label=<<b>reader-a1</b><br/><i>has-confidence(high)</i><br/><i>pliers-point</i>>]
+	reader [label=<<b>reader</b><br/><i>at-side(top)</i><br/><i>removable-component</i>>]
+	"reader-a0" [label=<<b>reader-a0</b><br/><i>has-confidence(low)</i><br/><i>lever-point</i>>]
+	"reader-s0" [label=<<b>reader-s0</b><br/><i>at-side(bottom)</i><br/><i>screw</i><br/><i>valid-sd(star-sd)</i>>]
+	reader -> "reader-a1" [label=<<i>has-affordance</i>>]
+	reader -> "reader-a0" [label=<<i>has-affordance</i>>]
+	reader -> "reader-s0" [label=<<i>fixed-by</i>>]
+}

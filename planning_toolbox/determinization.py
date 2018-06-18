@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import product
 
 from math import log
-from random import random
+import random
 
 import re
 
@@ -308,12 +308,13 @@ class HindsightDeterminizer(Determinizer):
 
 
 def sample_outcome(action):
-    r = random()
+    # return action.name+"_o{}".format(random.randrange(len(action.effect)))
+    r = random.random()
     acc = 0
     for idx, (p,e) in enumerate(action.effect):
         acc += p
         if r < acc:
             return action.name + "_o{}".format(idx)
-    return action.name + "_o{}".format(len(action.effect))
+    return action.name + "_o{}".format(len(action.effect)-1)
 
 

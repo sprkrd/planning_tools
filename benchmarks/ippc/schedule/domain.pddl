@@ -22,7 +22,7 @@
                     (current-phase Arrivals-and-updating)
                     (status ?arriving-packet Available)
                     (need-to-process-arrivals ?c))
-  :effect (and
+  :effect (and (decrease (reward) 1)
              (processed-arrivals ?c)
              (not (need-to-process-arrivals ?c))
              (probabilistic 100/1000
@@ -36,7 +36,7 @@
  :precondition (and
                    (current-phase Arrivals-and-updating)
                    (forall (?c - class) (processed-arrivals ?c)))
- :effect (and 
+ :effect (and (decrease (reward) 1) 
             (not (current-phase Arrivals-and-updating))
             (current-phase Cleanup-and-service)
             (forall (?p - packet)
@@ -58,7 +58,7 @@
   :precondition (and
                     (current-phase Cleanup-and-service)
                     (packetclass ?p ?c))
-  :effect (and
+  :effect (and (decrease (reward) 1)
               (not (dropped ?p))
               (not-dropped ?p)
               (forall (?u - timestep) (not (timetolive ?p ?u)))
@@ -73,7 +73,7 @@
                     (current-phase Cleanup-and-service)
                     (forall (?p1 - packet) (not-dropped ?p1))
                     (packetclass ?p ?c))
-  :effect (and
+  :effect (and (decrease (reward) 1)
             (forall (?c1 - class) (not (processed-arrivals ?c1)))
             (forall (?c1 - class) (need-to-process-arrivals ?c1))
             (not (current-phase Cleanup-and-service))
@@ -87,7 +87,7 @@
   :precondition (and
                     (current-phase Cleanup-and-service)
                     (forall (?p1 - packet) (not-dropped ?p1)))
-  :effect (and    
+  :effect (and (decrease (reward) 1) 
               (forall (?c1 - class) (not (processed-arrivals ?c1)))
               (forall (?c1 - class) (need-to-process-arrivals ?c1))
               (not (current-phase Cleanup-and-service))

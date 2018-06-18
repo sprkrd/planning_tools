@@ -1,0 +1,3 @@
+Agent name,Solved,Solved (%),Timeout,Timeout (%),Total,Avg. elapsed(s),Avg. length,Avg. reward
+ho-lo-15,0,0.0,0,0.0,30,nan,nan,nan
+ho-gl-15,3,10.0,20,66.66666666666667,30,48.50224447250366,7.0,-6.0

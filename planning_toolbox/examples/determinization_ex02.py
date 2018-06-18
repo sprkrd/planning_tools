@@ -5,7 +5,7 @@ from ..determinization import *
 
 def main(domainpath, problempath):
     domain = parse_file(domainpath, "domain")
-    problem = parse_file(problempath, "problem", domain)
+    # problem = parse_file(problempath, "problem", domain)
     determinizer = AllOutcomeDeterminizer()
     # print(domain)
     # print(problem)
@@ -13,10 +13,12 @@ def main(domainpath, problempath):
     determinizer = AlphaCostLikelihoodDeterminizer(alpha=0,base=0)
     # determinizer = HindsightDeterminizer("local", 10, True)
     determinizer.set_domain(domain)
-    print(determinizer.original_domain, end="\n---\n")
-    print(determinizer.preprocessed_domain, end="\n---\n")
-    print(determinizer.determinized_domain)
-    print(determinizer(problem))
+    # print(determinizer.original_domain, end="\n---\n")
+    # print(determinizer.preprocessed_domain, end="\n---\n")
+    bash_e = determinizer.preprocessed_domain.retrieve_action("lever-scara-medium-confidence").effect.simplify()
+    print(bash_e)
+    # print(determinizer.determinized_domain)
+    # print(determinizer(problem))
 
 
 if __name__ == "__main__":
