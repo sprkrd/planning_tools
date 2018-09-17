@@ -505,6 +505,9 @@ class Effect:
     def simplify(self):
         raise NotImplementedError()
 
+    def get_total_cost_increase(self):
+        raise NotImplementedError()
+
 
 class EmptyEffect(Effect):
 
@@ -540,6 +543,9 @@ class EmptyEffect(Effect):
 
     def __str__(self):
         return "(and)"
+
+    def get_total_cost_increase(self):
+        return []
 
 
 class AddEffect(Effect):
@@ -582,6 +588,9 @@ class AddEffect(Effect):
     def __str__(self):
         return str(self.add)
 
+    def get_total_cost_increase(self):
+        return []
+
 
 class DeleteEffect(Effect):
 
@@ -622,6 +631,9 @@ class DeleteEffect(Effect):
 
     def __str__(self):
         return lisp_list_to_str("not", self.delete)
+
+    def get_total_cost_increase(self):
+        return []
 
 
 class AndEffect(Effect):
@@ -704,6 +716,9 @@ class AndEffect(Effect):
     def __str__(self):
         return lisp_list_to_str("and", *self.effects)
 
+    def get_total_cost_increase(self):
+        return sum([eff.get_total_cost_increase() for eff in self.effects], [])
+
 
 class ForallEffect(Effect):
 
@@ -754,6 +769,9 @@ class ForallEffect(Effect):
 
     def __str__(self):
         return "(forall ({}) {})".format(self.parameters, self.effect)
+
+    def get_total_cost_increase(self):
+        return self.effect.get_total_cost_increase()
 
 
 class ConditionalEffect(Effect):
@@ -806,6 +824,9 @@ class ConditionalEffect(Effect):
 
     def __str__(self):
         return lisp_list_to_str("when", self.lhs, self.rhs)
+
+    def get_total_cost_increase(self):
+        return self.rhs.get_total_cost_increase()
 
 
 class AssignmentEffect(Effect):
@@ -880,6 +901,11 @@ class AssignmentEffect(Effect):
 
     def __str__(self):
         return lisp_list_to_str(self.assignop, self.lhs, self.rhs)
+
+    def get_total_cost_increase(self):
+        if self.lhs.name == "total-cost":
+            return [self]
+        return []
 
 
 class ProbabilisticEffect(Effect):
@@ -972,6 +998,9 @@ class ProbabilisticEffect(Effect):
 
     def __str__(self):
         return "(probabilistic {})".format(" ".join(str(p)+" "+str(e) for p, e in self.effects))
+
+    def get_total_cost_increase(self):
+        return sum([eff.get_total_cost_increase() for p, eff in self.effects], [])
 
 
 ####################
@@ -1118,6 +1147,9 @@ class Domain:
             ret += "(:functions " + "\n".join(str(f) for f in self.functions) + ")\n\n"            
         ret += "\n\n".join(map(str, self.actions)) + ")"
         return ret
+
+    def get_total_cost_increase(self):
+        return sum([a.effect.get_total_cost_increase() for a in self.actions], [])
 
 
 class Goal:

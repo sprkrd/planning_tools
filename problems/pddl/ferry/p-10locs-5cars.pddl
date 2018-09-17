@@ -113,6 +113,7 @@
 (not-eq l8 l9)
 (not-eq l9 l8)
 (empty-ferry)
+(= (total-cost) 0)
 (at c0 l4)
 (at c1 l8)
 (at c2 l5)
@@ -129,6 +130,7 @@
 (at c4 l4)
 )
 )
+(:metric minimize (total-cost))
 )
 
 

@@ -4,16 +4,18 @@ from ..determinization import *
 
 
 def main(filepath):
-    domain, problem = parse_file(filepath, "both")
+    # domain, problem = parse_file(filepath, "both")
+    domain = parse_file(filepath, "domain")
     # determinizer = AllOutcomeDeterminizer()
     # determinizer = SingleOutcomeDeterminizer()
-    determinizer = AlphaCostLikelihoodDeterminizer(base=1)
+    determinizer = AlphaCostLikelihoodDeterminizer(alpha=1)
     # determinizer = HindsightDeterminizer("local", 10, True)
+    domain.actions = [domain.retrieve_action("bash")]
     determinizer.set_domain(domain)
     print(determinizer.original_domain, end="\n---\n")
     print(determinizer.preprocessed_domain, end="\n---\n")
     print(determinizer.determinized_domain)
-    print(determinizer(problem))
+    # print(determinizer(problem))
 
 
 if __name__ == "__main__":

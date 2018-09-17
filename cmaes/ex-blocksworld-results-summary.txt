@@ -1,0 +1,2 @@
+Agent name,Solved,Solved (%),Timeout,Timeout (%),Total,Avg. elapsed(s),Avg. length,Avg. reward
+alph-0.0,0,0.0,0,0.0,450,nan,nan,nan

@@ -1,4 +1,5 @@
 (define (domain ferry)
+   (:requirements :strips :action-costs)
    (:predicates (not-eq ?x ?y)
 		(car ?c)
 		(location ?l)
@@ -7,12 +8,14 @@
 		(empty-ferry)
 		(on ?c))
 
+   (:functions (total-cost))
+
    (:action sail
        :parameters  (?from ?to)
        :precondition (and (not-eq ?from ?to) 
                           (location ?from) (location ?to) (at-ferry ?from))
        :effect (and  (at-ferry ?to)
-		     (not (at-ferry ?from))))
+		     (not (at-ferry ?from)) (increase (total-cost) 0)))
 
 
    (:action board

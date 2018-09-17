@@ -133,7 +133,7 @@ class Graph:
             gv_graph.edge(str(from_), str(to),
                     "<"+nice_html_list(labels)+">", style=style)
         gv_graph.node_attr["shape"] = "box"
-        gv_graph.graph_attr["rankdir"] = "LR"
+        # gv_graph.graph_attr["rankdir"] = "LR"
         return gv_graph
 
     def to_pdf(self, filename):

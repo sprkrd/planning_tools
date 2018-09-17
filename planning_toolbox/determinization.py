@@ -132,7 +132,8 @@ class AlphaCostLikelihoodDeterminizer(Determinizer):
                         self.alpha, round_=self.round_)
                 offset = self.base - log(p)
                 if self.round_ > 0: offset = int(round(offset*10**self.round_))
-                if offset > 1e-6: anew.effect = anew.effect.add_cost_offset(offset)
+                # if offset > 1e-6: anew.effect = anew.effect.add_cost_offset(offset)
+                anew.effect = anew.effect.add_cost_offset(offset)
                 # don't consider actions that only increase the total cost
                 # and don't modify the state in any other way
                 anew.effect = anew.effect.simplify()
