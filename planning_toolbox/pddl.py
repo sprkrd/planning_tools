@@ -2,6 +2,7 @@
 ## BASIC TYPES ##
 #################
 
+import warnings
 from copy   import deepcopy
 from functools import reduce
 from itertools import product
@@ -470,6 +471,9 @@ class Effect:
     def apply(self, state, out=None):
         raise NotImplementedError()
 
+    def get_cost(self, state):
+        raise NotImplementedError()
+
     def bind(self, sigma):
         raise NotImplementedError()
 
@@ -510,6 +514,9 @@ class EmptyEffect(Effect):
 
     def apply(self, state, out=None):
         return out or state.copy()
+
+    def get_cost(self, state):
+        return 0
 
     def bind(self, sigma):
         return self
@@ -564,6 +571,9 @@ class AddEffect(Effect):
     def is_empty(self):
         return False
 
+    def get_cost(self, state):
+        return 0
+
     def modified_predicates(self):
         return set([self.add.name])
 
@@ -592,6 +602,9 @@ class DeleteEffect(Effect):
         out = out or state.copy()
         out.delete_predicate(self.delete)
         return out
+
+    def get_cost(self, state):
+        return 0
 
     def bind(self, sigma):
         return DeleteEffect(self.delete.bind(sigma))
@@ -634,6 +647,9 @@ class AndEffect(Effect):
         for effect in self.effects:
             out = effect.apply(state, out)
         return out
+
+    def get_cost(self, state):
+        return sum(eff.get_cost(state) for eff in self.effects)
 
     def bind(self, sigma):
         return AndEffect(*(a.bind(sigma) for a in self.effects))
@@ -717,6 +733,12 @@ class ForallEffect(Effect):
            out = self.effect.bind(sigma).apply(state, out)
        return out
 
+    def get_cost(self, state):
+        cost = 0
+        for sigma in all_possible_assignments(state.problem, self.parameters):
+            cost += self.effect.bind(sigma).get_cost(state)
+        return cost
+
     def bind(self, sigma):
         return ForallEffect(self.parameters.bind(sigma), self.effect.bind(sigma))
 
@@ -768,6 +790,12 @@ class ConditionalEffect(Effect):
         if lhs:
             out = self.rhs.apply(state, out)
         return out
+
+    def get_cost(self, state):
+        lhs = self.lhs.eval(state)
+        if lhs:
+            return self.rhs.get_cost(state)
+        return 0
 
     def bind(self, sigma):
         return ConditionalEffect(self.lhs.bind(sigma), self.rhs.bind(sigma))
@@ -838,6 +866,14 @@ class AssignmentEffect(Effect):
 
     def expand_probabilistic_effects(self):
         return ProbabilisticEffect((1.0, self))
+
+    def get_cost(self, state):
+        if self.lhs.name == "total-cost":
+            if self.assignop == "increase":
+                return self.rhs.eval(state)
+            elif self.assignop == "decrease":
+                return -self.rhs.eval(state)
+        return 0
 
     def bind(self, sigma):
         return AssignmentEffect(self.assignop, self.lhs.bind(sigma),
@@ -916,6 +952,9 @@ class ProbabilisticEffect(Effect):
         if remaining > 1e-6:
             outcomes.append((remaining, EmptyEffect()))
         return ProbabilisticEffect(*outcomes)
+
+    def get_cost(self, state):
+        return 0
         
     def bind(self, sigma):
         return ProbabilisticEffect(*((p,e.bind(sigma)) for p, e in self.effects))
@@ -996,6 +1035,9 @@ class Action:
                 new_state.reward += state.problem.goal.reward
             return new_state
         return None
+
+    def get_cost(self, state):
+        return self.effect.get_cost(state)
 
     def bind(self, sigma):
         return Action(self.name, self.parameters.bind(sigma),
@@ -1148,9 +1190,9 @@ class InitialState:
     def copy(self):
         return deepcopy(self)
 
-    def get_state(self):
+    def get_state(self, problem):
         # [TODO] Probabilistic
-        return SymbolicState(self.predicates, self.functions)
+        return SymbolicState(self.predicates, self.functions, problem)
 
     def erase_reward(self):
         try: del self.functions[Function("reward")]
@@ -1182,6 +1224,7 @@ class Problem:
         self.objects = ObjectList() if objects is None else objects
         self.init = InitialState() if init is None else init
         self.goal = Goal(EmptyQuery()) if goal is None else goal
+        self.static_functions = {}
 
     def all_objects_of_type(self, type_=None):
         objects_of_type = []
@@ -1199,8 +1242,7 @@ class Problem:
                 yield action.bind(sigma)
 
     def get_initial_state(self):
-        s0 = self.init.get_state()
-        s0.problem = self
+        s0 = self.init.get_state(self)
         if self.domain.allows_reward_fluent(): s0.reward = 0
         return s0
 
@@ -1234,10 +1276,10 @@ class SymbolicState:
         self.predicates = set() if predicates is None else set(predicates)
         self.total_cost = None
         self.reward = None
+        self.problem = problem
         if functions is not None:
             for fun, val in functions.items():
                 self.set_function_value(fun, val)
-        self.problem = problem
         self._hash = None
 
     def add_predicate(self, predicate):
@@ -1264,14 +1306,16 @@ class SymbolicState:
         elif function.name == "reward":
             self.reward = value
         else:
-            raise Exception("Arbitrary functions not implemented")
+            #treat it as a static function, and store its value in the problem
+            self.problem.static_functions[function] = value
+            warnings.warn(f"Setting function {function}={value}: this is treated as a static function and is not part of the state")
 
     def get_function_value(self, function):
         if function.name == "total-cost":
             return self.total_cost
         if function.name == "reward":
             return self.reward
-        raise Exception("Non-supported function: {}".format(function.name))
+        return self.problem.static_functions[function] 
 
     def applicable_actions(self):
         for grop in self.problem.ground_operators():
